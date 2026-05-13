@@ -606,6 +606,69 @@ tbody td { padding: 9px 13px; vertical-align: middle; }
 .step-label { font-size: 13px; font-weight: 600; color: var(--text); }
 .step-detail { font-size: 11.5px; color: var(--text-3); margin-top: 2px; font-family: 'DM Mono', monospace; }
 
+/* ── SELECTION & DELETE BAR ──────────────────────────── */
+.sel-bar {
+  display: none;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  background: var(--skf-light);
+  border-bottom: 1px solid var(--skf-mid);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--skf-dark);
+}
+.sel-bar.visible { display: flex; }
+.sel-bar-count { flex: 1; }
+.btn-delete-sel {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 13px; border-radius: var(--r);
+  background: var(--red); color: #fff;
+  border: none; font-family: 'DM Sans', sans-serif;
+  font-size: 12.5px; font-weight: 600; cursor: pointer;
+  transition: opacity .15s;
+}
+.btn-delete-sel:hover { opacity: .88; }
+.btn-desel {
+  padding: 6px 11px; border-radius: var(--r);
+  background: transparent; color: var(--skf);
+  border: 1px solid var(--skf-mid);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12.5px; font-weight: 500; cursor: pointer;
+  transition: background .12s;
+}
+.btn-desel:hover { background: var(--skf-mid); }
+.undo-bar {
+  display: none;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: var(--text);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: var(--r);
+  margin-bottom: 10px;
+  animation: toastIn .2s ease;
+}
+.undo-bar.visible { display: flex; }
+.undo-bar-msg { flex: 1; }
+.undo-btn {
+  padding: 5px 13px; border-radius: var(--r);
+  background: #fff; color: var(--text);
+  border: none; font-family: 'DM Sans', sans-serif;
+  font-size: 12.5px; font-weight: 700; cursor: pointer;
+}
+.undo-timer {
+  font-size: 11.5px; color: rgba(255,255,255,.55);
+  font-family: 'DM Mono', monospace; min-width: 26px; text-align: right;
+}
+tbody tr.selected { background: #EBF3FD !important; }
+.cb-cell { width: 36px; padding: 9px 8px 9px 14px !important; }
+input[type=checkbox].row-cb {
+  width: 15px; height: 15px; cursor: pointer; accent-color: var(--skf);
+}
+
 /* ── OCR MODULE ──────────────────────────────────────── */
 .ocr-drop {
   border: 2px dashed var(--border-2);
@@ -920,6 +983,13 @@ tbody td { padding: 9px 13px; vertical-align: middle; }
         <div class="result-count"><span id="countVis">0</span> resultados</div>
       </div>
 
+      <!-- Barra deshacer -->
+      <div class="undo-bar" id="undoBar">
+        <div class="undo-bar-msg" id="undoMsg">—</div>
+        <button class="undo-btn" onclick="undoDelete()">Deshacer</button>
+        <div class="undo-timer" id="undoTimer">60</div>
+      </div>
+
       <div class="card">
         <div class="card-header">
           <div class="card-title">Componentes</div>
@@ -928,10 +998,19 @@ tbody td { padding: 9px 13px; vertical-align: middle; }
             <button class="btn-icon" onclick="syncSP()" title="Sincronizar con SharePoint">↺</button>
           </div>
         </div>
+        <!-- Barra de selección -->
+        <div class="sel-bar" id="selBar">
+          <div class="sel-bar-count" id="selCount">0 seleccionados</div>
+          <button class="btn-desel" onclick="clearSelection()">Cancelar</button>
+          <button class="btn-delete-sel" onclick="deleteSelected()">🗑 Eliminar seleccionados</button>
+        </div>
         <div class="table-scroll">
           <table>
             <thead>
               <tr>
+                <th class="cb-cell" style="cursor:default">
+                  <input type="checkbox" class="row-cb" id="cbAll" onchange="toggleSelectAll(this.checked)" title="Seleccionar todo">
+                </th>
                 <th onclick="sortBy('codigo')">Código <span class="sort-icon" id="si-codigo">↕</span></th>
                 <th onclick="sortBy('descripcion')">Descripción <span class="sort-icon" id="si-descripcion">↕</span></th>
                 <th onclick="sortBy('categoria')">Categoría <span class="sort-icon" id="si-categoria">↕</span></th>
@@ -943,7 +1022,7 @@ tbody td { padding: 9px 13px; vertical-align: middle; }
               </tr>
             </thead>
             <tbody id="invBody">
-              <tr><td colspan="8" style="padding:32px;text-align:center;color:var(--text-3)">Inicializando…</td></tr>
+              <tr><td colspan="9" style="padding:32px;text-align:center;color:var(--text-3)">Inicializando…</td></tr>
             </tbody>
           </table>
         </div>
@@ -1107,6 +1186,8 @@ tbody td { padding: 9px 13px; vertical-align: middle; }
 /* ── STATE ──────────────────────────────────────────── */
 const S = {
   inv: [], mov: [],
+  selected: new Set(),
+  undoSnapshot: null, undoTimer: null, undoSecs: 0,
   spUrl: 'https://skfgroup.sharepoint.com/sites/SFSOARG',
   connected: false,
   page: 1, perPage: 20,
@@ -1280,7 +1361,7 @@ function status(it) {
 function renderTable(data) {
   const tb = document.getElementById('invBody');
   if (!data.length && S.inv.length === 0) {
-    tb.innerHTML = `<tr><td colspan="8" style="padding:48px 32px;text-align:center">
+    tb.innerHTML = `<tr><td colspan="9" style="padding:48px 32px;text-align:center">
       <div style="font-size:32px;margin-bottom:10px">📦</div>
       <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:4px">Inventario vacío</div>
       <div style="font-size:13px;color:var(--text-3);margin-bottom:16px">Agregá el primer ítem para comenzar</div>
@@ -1289,7 +1370,7 @@ function renderTable(data) {
     return;
   }
   if (!data.length) {
-    tb.innerHTML = `<tr><td colspan="8" style="padding:40px;text-align:center;color:var(--text-3)">Sin resultados para los filtros seleccionados.</td></tr>`;
+    tb.innerHTML = `<tr><td colspan="9" style="padding:40px;text-align:center;color:var(--text-3)">Sin resultados para los filtros seleccionados.</td></tr>`;
     return;
   }
   tb.innerHTML = data.map(it => {
@@ -1297,7 +1378,12 @@ function renderTable(data) {
     const pct = it.stockMinimo > 0 ? Math.min(100, Math.round(it.stockActual / it.stockMinimo * 100)) : 100;
     const stLabel = { ok: 'Normal', low: 'Stock bajo', out: 'Sin stock' }[s];
     const stC     = it.stockActual === 0 ? 'var(--red)' : s === 'low' ? 'var(--yellow)' : 'var(--green)';
-    return `<tr>
+    const isSel   = S.selected.has(it.id);
+    return `<tr class="${isSel ? 'selected' : ''}" id="tr-${it.id}">
+      <td class="cb-cell">
+        <input type="checkbox" class="row-cb" ${isSel ? 'checked' : ''}
+               onchange="toggleRowSel('${it.id}', this.checked)">
+      </td>
       <td class="td-code">${esc(it.codigo)}</td>
       <td class="td-desc">${esc(it.descripcion)}</td>
       <td><span class="badge badge-cat">${esc(it.categoria)}</span></td>
@@ -2034,6 +2120,89 @@ function convertFechaToISO(f) {
 
 function closeOCRModal() { document.getElementById('overlayOCR').classList.remove('open'); }
 function closeOnBgOCR(e) { if (e.target === document.getElementById('overlayOCR')) closeOCRModal(); }
+
+
+/* ── SELECCIÓN Y BORRADO ────────────────────────────── */
+function toggleRowSel(id, checked) {
+  if (checked) S.selected.add(id);
+  else S.selected.delete(id);
+  updateSelBar();
+  const cbAll = document.getElementById('cbAll');
+  if (cbAll) {
+    const vis = getVisibleIds();
+    cbAll.checked = vis.length > 0 && vis.every(i => S.selected.has(i));
+    cbAll.indeterminate = S.selected.size > 0 && !cbAll.checked;
+  }
+}
+
+function toggleSelectAll(checked) {
+  getVisibleIds().forEach(id => checked ? S.selected.add(id) : S.selected.delete(id));
+  document.querySelectorAll('#invBody tr[id^="tr-"] .row-cb').forEach(cb => {
+    const id = cb.closest('tr')?.id?.replace('tr-', '');
+    if (id) { cb.checked = S.selected.has(id); cb.closest('tr').classList.toggle('selected', S.selected.has(id)); }
+  });
+  updateSelBar();
+}
+
+function getVisibleIds() {
+  return [...document.querySelectorAll('#invBody tr[id^="tr-"]')].map(tr => tr.id.replace('tr-',''));
+}
+
+function clearSelection() {
+  S.selected.clear();
+  updateSelBar();
+  filterRender();
+}
+
+function updateSelBar() {
+  const n = S.selected.size;
+  const bar = document.getElementById('selBar');
+  const cnt = document.getElementById('selCount');
+  if (!bar) return;
+  bar.classList.toggle('visible', n > 0);
+  if (cnt) cnt.textContent = n === 1 ? '1 ítem seleccionado' : `${n} ítems seleccionados`;
+}
+
+function deleteSelected() {
+  if (!S.selected.size) return;
+  const ids = [...S.selected];
+  S.undoSnapshot = { inv: JSON.parse(JSON.stringify(S.inv)) };
+  S.inv = S.inv.filter(it => !ids.includes(it.id));
+  S.selected.clear();
+  save(); filterRender(); updateSelBar();
+  startUndoTimer(ids.length);
+}
+
+function startUndoTimer(n) {
+  if (S.undoTimer) clearInterval(S.undoTimer);
+  S.undoSecs = 60;
+  const bar = document.getElementById('undoBar');
+  const msg = document.getElementById('undoMsg');
+  const timerEl = document.getElementById('undoTimer');
+  if (!bar) return;
+  bar.classList.add('visible');
+  if (msg) msg.textContent = `${n} ítem${n !== 1 ? 's' : ''} eliminado${n !== 1 ? 's' : ''}`;
+  if (timerEl) timerEl.textContent = '60';
+  S.undoTimer = setInterval(() => {
+    S.undoSecs--;
+    if (timerEl) timerEl.textContent = S.undoSecs;
+    if (S.undoSecs <= 0) {
+      clearInterval(S.undoTimer);
+      if (bar) bar.classList.remove('visible');
+      S.undoSnapshot = null;
+    }
+  }, 1000);
+}
+
+function undoDelete() {
+  if (!S.undoSnapshot) return;
+  S.inv = S.undoSnapshot.inv;
+  S.undoSnapshot = null;
+  clearInterval(S.undoTimer);
+  document.getElementById('undoBar')?.classList.remove('visible');
+  save(); filterRender();
+  toast('Borrado deshecho — ítems restaurados', 'ok');
+}
 
 
 /* ── STORAGE (localStorage con fallback a cookies para SharePoint) ── */
