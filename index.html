@@ -1490,22 +1490,33 @@ function saveMov(tipo, itemId) {
 }
 
 /* ── GOOGLE SHEETS API (JSONP — sin CORS) ───────────── */
+let _gsCbCounter = 0;
 function gsCall(action, data) {
   return new Promise((resolve, reject) => {
-    const cbName = 'gs_cb_' + Date.now();
+    const cbName = 'gs_cb_' + Date.now() + '_' + (++_gsCbCounter);
     let url = S.spUrl + '?action=' + encodeURIComponent(action) + '&callback=' + cbName;
     if (data) url += '&data=' + encodeURIComponent(JSON.stringify(data));
     const script = document.createElement('script');
+    let resolved = false;
     const timer = setTimeout(() => {
-      cleanup(); reject(new Error('Timeout — verificá la URL del Web App'));
-    }, 15000);
+      if (resolved) return;
+      cleanup();
+      reject(new Error('Timeout 20s — sin respuesta del Web App'));
+    }, 20000);
     window[cbName] = function(json) {
+      resolved = true;
       cleanup();
       if (!json.ok) reject(new Error(json.error || 'Error en servidor'));
       else resolve(json);
     };
-    function cleanup() { clearTimeout(timer); delete window[cbName]; if (script.parentNode) script.parentNode.removeChild(script); }
-    script.onerror = () => { cleanup(); reject(new Error('Failed to load script — verificá la URL')); };
+    function cleanup() {
+      clearTimeout(timer);
+      try { delete window[cbName]; } catch(e) { window[cbName] = undefined; }
+      if (script.parentNode) script.parentNode.removeChild(script);
+    }
+    // No usar script.onerror: Apps Script redirige a googleusercontent.com
+    // y algunos browsers disparan onerror aunque la respuesta llegue OK.
+    // El timer + el callback son suficientes.
     script.src = url;
     document.head.appendChild(script);
   });
