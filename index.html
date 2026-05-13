@@ -606,6 +606,44 @@ tbody td { padding: 9px 13px; vertical-align: middle; }
 .step-label { font-size: 13px; font-weight: 600; color: var(--text); }
 .step-detail { font-size: 11.5px; color: var(--text-3); margin-top: 2px; font-family: 'DM Mono', monospace; }
 
+/* ── OCR MODULE ──────────────────────────────────────── */
+.ocr-drop {
+  border: 2px dashed var(--border-2);
+  border-radius: var(--r2);
+  padding: 28px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: all .2s;
+  background: var(--surface-2);
+  position: relative;
+}
+.ocr-drop:hover, .ocr-drop.drag { border-color: var(--skf); background: var(--skf-light); }
+.ocr-drop input[type=file] { position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%; }
+.ocr-drop-icon { font-size: 32px; margin-bottom: 8px; }
+.ocr-drop-label { font-size: 14px; font-weight: 600; color: var(--text-2); }
+.ocr-drop-hint { font-size: 11.5px; color: var(--text-3); margin-top: 4px; }
+.ocr-preview { width:100%;max-height:200px;object-fit:contain;border-radius:var(--r);border:1px solid var(--border);margin-top:10px; }
+.ocr-spinner { display:inline-block;width:18px;height:18px;border:2px solid var(--skf-mid);border-top-color:var(--skf);border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px; }
+@keyframes spin{to{transform:rotate(360deg)}}
+.ocr-result-table { width:100%;border-collapse:collapse;font-size:13px;margin-top:10px; }
+.ocr-result-table th { padding:7px 10px;text-align:left;font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--border);background:var(--surface-2); }
+.ocr-result-table td { padding:7px 10px;border-bottom:1px solid #EEF1F6;vertical-align:middle; }
+.ocr-result-table tr:last-child td { border-bottom:none; }
+.ocr-match { color:var(--green);font-size:11px;font-weight:600; }
+.ocr-nomatch { color:var(--yellow);font-size:11px;font-weight:600; }
+.ocr-qty-input { width:60px;padding:4px 7px;border:1px solid var(--border-2);border-radius:var(--r);font-family:'DM Mono',monospace;font-size:13px;text-align:center; }
+.ocr-qty-input.highlight { border-color:var(--yellow);background:var(--yellow-bg); }
+.ocr-header-grid { display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px; }
+.ocr-field { display:flex;flex-direction:column;gap:3px; }
+.ocr-field label { font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px; }
+.ocr-field input, .ocr-field select { padding:6px 9px;border:1px solid var(--border-2);border-radius:var(--r);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text);outline:none; }
+.ocr-field input:focus, .ocr-field select:focus { border-color:var(--skf); }
+.ocr-key-badge { display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:10px;font-size:11px;font-weight:600;background:var(--skf-light);color:var(--skf);border:1px solid var(--skf-mid); }
+.modal-wide { width: 680px; }
+.ocr-api-row { display:flex;gap:8px;align-items:center;margin-bottom:10px; }
+.ocr-api-row input { flex:1;padding:7px 10px;border:1px solid var(--border-2);border-radius:var(--r);font-family:'DM Mono',monospace;font-size:12px;outline:none; }
+.ocr-api-row input:focus { border-color:var(--skf); }
+
 /* ── MODAL ───────────────────────────────────────────── */
 .overlay {
   position: fixed; inset: 0;
@@ -762,13 +800,16 @@ tbody td { padding: 9px 13px; vertical-align: middle; }
       <span class="tb-nav-icon">↕</span> Movimientos
     </div>
     <div class="tb-nav-item" onclick="showView('config', this)">
-      <span class="tb-nav-icon">⚙</span> Config
+      <span class="tb-nav-icon">⚙</span> Configuración
+    </div>
+    <div class="tb-nav-item" onclick="openOCRModal()" style="border-left:1px solid rgba(255,255,255,.15);margin-left:8px;padding-left:16px">
+      <span class="tb-nav-icon">📷</span> Leer Remesa
     </div>
   </nav>
   <div class="tb-right">
     <div class="sp-pill" id="spPill" onclick="showView('config')">
       <div class="sp-dot"></div>
-      <span id="spText">Sin conexión GSheets</span>
+      <span id="spText">Sin conexión SP</span>
     </div>
   </div>
 </div>
@@ -796,6 +837,9 @@ tbody td { padding: 9px 13px; vertical-align: middle; }
     <div class="sb-item" onclick="openNewItemModal()">
       <span class="sb-item-icon">＋</span> Nuevo Ítem
     </div>
+    <div class="sb-item" onclick="openOCRModal()" style="color:var(--skf);font-weight:600">
+      <span class="sb-item-icon">📷</span> Leer Remesa
+    </div>
     <div class="sb-section">Sistema</div>
     <div class="sb-item" id="sb-config" onclick="showView('config', this)">
       <span class="sb-item-icon">⚙</span> SharePoint
@@ -819,6 +863,7 @@ tbody td { padding: 9px 13px; vertical-align: middle; }
         </div>
         <div class="page-actions">
           <button class="btn btn-secondary btn-sm" onclick="exportCSV()">↓ Exportar CSV</button>
+          <button class="btn btn-secondary btn-sm" onclick="openOCRModal()">📷 Leer Remesa</button>
           <button class="btn btn-primary btn-sm" onclick="openNewItemModal()">+ Nuevo Ítem</button>
         </div>
       </div>
@@ -952,82 +997,96 @@ tbody td { padding: 9px 13px; vertical-align: middle; }
     <div class="view" id="view-config">
       <div class="page-header">
         <div>
-          <div class="page-title">Configuración Google Sheets</div>
-          <div class="page-sub">Backend gratuito · multi-usuario · historial completo</div>
+          <div class="page-title">Configuración SharePoint</div>
+          <div class="page-sub">Conexión via API REST · sin registro Azure AD · sesión M365</div>
         </div>
       </div>
 
       <div class="info-banner">
-        <div class="info-banner-title">Backend: Google Apps Script + Google Sheets</div>
+        <div class="info-banner-title">Sitio detectado — SKF SFSOARG</div>
         <div class="info-banner-body">
-          Seguí los pasos de configuración inicial. Una vez conectado, todos los datos<br>
-          se guardan en Google Sheets con auditoría automática de cada operación.
+          https://skfgroup.sharepoint.com/sites/SFSOARG<br>
+          02  CoMo Proyects / 01 - Laboratorio CoMo / App Proyectos / INVENTARIO
         </div>
       </div>
 
       <div class="cfg-card">
-        <div class="cfg-title">URL del Web App (Apps Script)</div>
-        <div class="cfg-sub">Pegá la URL de implementación que genera Google Apps Script</div>
+        <div class="cfg-title">URL del sitio SharePoint</div>
+        <div class="cfg-sub">URL base del sitio donde están las listas</div>
         <div class="cfg-row">
-          <input type="url" id="spUrlInput" placeholder="https://script.google.com/macros/s/XXXXXXX/exec">
+          <input type="url" id="spUrlInput" value="https://skfgroup.sharepoint.com/sites/SFSOARG" placeholder="https://skfgroup.sharepoint.com/sites/SFSOARG">
           <button class="btn btn-secondary btn-sm" onclick="saveSpUrl()">Guardar</button>
           <button class="btn btn-primary btn-sm" onclick="testSP()">Probar conexión</button>
         </div>
       </div>
 
       <div class="cfg-card">
-        <div class="cfg-title">Pasos de configuración inicial</div>
-        <div class="cfg-sub">Realizá esto una sola vez para habilitar el backend compartido</div>
+        <div class="cfg-title">Estado de las listas</div>
+        <div class="cfg-sub">Verificá que las 3 listas existan en el sitio antes de operar</div>
         <div class="step-list">
           <div class="step-item">
             <div class="step-num" id="sn1">1</div>
             <div>
-              <div class="step-label">Crear Google Sheet</div>
-              <div class="step-detail" id="sd1">Abrí Google Sheets → Nuevo → Nombralo "SKF Inventario CoMo"</div>
+              <div class="step-label">Lista: Inventario</div>
+              <div class="step-detail" id="sd1">Codigo · Descripcion · Categoria · StockActual · StockMinimo · Unidad</div>
             </div>
           </div>
           <div class="step-item">
             <div class="step-num" id="sn2">2</div>
             <div>
-              <div class="step-label">Cargar Apps Script</div>
-              <div class="step-detail" id="sd2">Extensiones → Apps Script → pegá el contenido del archivo .js descargado → Guardar</div>
+              <div class="step-label">Lista: Entradas</div>
+              <div class="step-detail" id="sd2">Fecha · CodigoItem · Cantidad · Responsable · Observaciones</div>
             </div>
           </div>
           <div class="step-item">
             <div class="step-num" id="sn3">3</div>
             <div>
-              <div class="step-label">Implementar como Web App</div>
-              <div class="step-detail" id="sd3">Implementar → Nueva implementación → App web | Ejecutar como: Yo | Acceso: Cualquier usuario de Google → Copiar URL</div>
-            </div>
-          </div>
-          <div class="step-item">
-            <div class="step-num">4</div>
-            <div>
-              <div class="step-label">Pegar URL y probar conexión</div>
-              <div class="step-detail">Pegá la URL en el campo de arriba → Guardar → Probar conexión</div>
+              <div class="step-label">Lista: Salidas</div>
+              <div class="step-detail" id="sd3">Fecha · CodigoItem · Cantidad · Responsable · Observaciones</div>
             </div>
           </div>
         </div>
         <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn btn-primary btn-sm" onclick="verifyLists()">Verificar hojas</button>
+          <button class="btn btn-primary btn-sm" onclick="verifyLists()">Verificar listas</button>
           <button class="btn btn-secondary btn-sm" onclick="syncSP()">↺ Sincronizar todo</button>
         </div>
       </div>
 
       <div class="cfg-card">
-        <div class="cfg-title">Cargar datos iniciales</div>
-        <div class="cfg-sub">Importá el inventario desde JSON o cargá datos de demostración</div>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <input type="file" id="fileInput" accept=".json" style="font-size:12px;color:var(--text-2)">
-          <button class="btn btn-secondary btn-sm" onclick="importJSON()">Cargar JSON</button>
-          <button class="btn btn-secondary btn-sm" onclick="loadDemo()">Cargar demo (236 ítems)</button>
+        <div class="cfg-title">API Key — Claude Vision (OCR)</div>
+        <div class="cfg-sub">Necesaria para leer remesas manuales con foto. Se guarda solo en este navegador.</div>
+        <div class="ocr-api-row">
+          <input type="password" id="claudeApiKeyInput" placeholder="sk-ant-api03-…" autocomplete="off">
+          <button class="btn btn-secondary btn-sm" onclick="saveApiKey()">Guardar</button>
         </div>
-        <div class="form-hint" style="margin-top:8px">Formato: array de objetos con campos Codigo, Descripcion, Categoria, StockActual, StockMinimo, Unidad</div>
+        <div class="form-hint">La clave nunca sale del navegador — se usa directamente contra api.anthropic.com</div>
+      </div>
+
+      <div class="cfg-card">
+        <div class="cfg-title">Importar inventario</div>
+        <div class="cfg-sub">Importá ítems desde un archivo JSON</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input type="file" id="fileInput" accept=".json,.csv" style="font-size:12px;color:var(--text-2)">
+          <button class="btn btn-secondary btn-sm" onclick="importJSON()">Cargar JSON</button>
+        </div>
+        <div class="form-hint" style="margin-top:8px">Formato esperado: array de objetos con campos codigo, descripcion, categoria, stockActual, stockMinimo, unidad</div>
       </div>
     </div><!-- /config -->
 
   </main>
 </div><!-- /shell -->
+
+<!-- ═══ MODAL OCR ══════════════════════════════════════════ -->
+<div class="overlay" id="overlayOCR" onclick="closeOnBgOCR(event)">
+  <div class="modal modal-wide">
+    <div class="modal-header">
+      <div class="modal-title" id="ocrModalTitle">📷 Leer Remesa Manual</div>
+      <button class="modal-close" onclick="closeOCRModal()">✕</button>
+    </div>
+    <div class="modal-body" id="ocrModalBody" style="max-height:75vh;overflow-y:auto"></div>
+    <div class="modal-footer" id="ocrModalFooter"></div>
+  </div>
+</div>
 
 <!-- ═══ MODAL ════════════════════════════════════════════ -->
 <div class="overlay" id="overlay" onclick="closeOnBg(event)">
@@ -1079,17 +1138,15 @@ function init() {
   } catch(e) {
   }
 
-  // Load demo if no persisted data
-  if (!S.inv || S.inv.length === 0) {
-    loadDemo(true);
-    return; // loadDemo calls render functions
-  }
+  // Sin demo — arranque limpio
+  if (!S.inv) S.inv = [];
 
   // Render
   filterRender();
   renderMov();
   updateKPIs();
   updateNav();
+  loadApiKey();
 }
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', init);
@@ -1222,6 +1279,15 @@ function status(it) {
 
 function renderTable(data) {
   const tb = document.getElementById('invBody');
+  if (!data.length && S.inv.length === 0) {
+    tb.innerHTML = `<tr><td colspan="8" style="padding:48px 32px;text-align:center">
+      <div style="font-size:32px;margin-bottom:10px">📦</div>
+      <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:4px">Inventario vacío</div>
+      <div style="font-size:13px;color:var(--text-3);margin-bottom:16px">Agregá el primer ítem para comenzar</div>
+      <button class="btn btn-primary btn-sm" onclick="openNewItemModal()">+ Agregar primer ítem</button>
+    </td></tr>`;
+    return;
+  }
   if (!data.length) {
     tb.innerHTML = `<tr><td colspan="8" style="padding:40px;text-align:center;color:var(--text-3)">Sin resultados para los filtros seleccionados.</td></tr>`;
     return;
@@ -1458,10 +1524,7 @@ function saveNewItem() {
   };
   S.inv.push(it); save(); closeModal(); filterRender();
   toast(`Ítem creado: ${codigo}`, 'ok');
-  if (S.connected) pushSP('Inventario', {
-    Codigo: it.codigo, Descripcion: it.descripcion, Categoria: it.categoria,
-    StockActual: it.stockActual, StockMinimo: it.stockMinimo, Unidad: it.unidad,
-  });
+  if (S.connected) pushSP('Inventario', it);
 }
 
 function saveMov(tipo, itemId) {
@@ -1480,62 +1543,32 @@ function saveMov(tipo, itemId) {
   S.mov.push(mov); save(); closeModal(); filterRender(); renderMov();
   toast(`${tipo === 'entrada' ? 'Entrada' : 'Salida'} registrada: ${qty} ${it.unidad} — ${it.codigo}`, 'ok');
   if (S.connected) {
-    const gsData = {
-      Fecha: mov.fecha, Codigo: it.codigo, Descripcion: it.descripcion,
-      Cantidad: qty, Responsable: mov.responsable, Observaciones: mov.observaciones,
-    };
-    pushSP(tipo === 'entrada' ? 'Entradas' : 'Salidas', gsData);
+    pushSP(tipo === 'entrada' ? 'Entradas' : 'Salidas', mov);
     updateSPItem(it);
   }
 }
 
-/* ── GOOGLE SHEETS API (JSONP — sin CORS) ───────────── */
-let _gsCbCounter = 0;
-function gsCall(action, data) {
-  return new Promise((resolve, reject) => {
-    const cbName = 'gs_cb_' + Date.now() + '_' + (++_gsCbCounter);
-    let url = S.spUrl + '?action=' + encodeURIComponent(action) + '&callback=' + cbName;
-    if (data) url += '&data=' + encodeURIComponent(JSON.stringify(data));
-    const script = document.createElement('script');
-    let resolved = false;
-    const timer = setTimeout(() => {
-      if (resolved) return;
-      cleanup();
-      reject(new Error('Timeout 20s — sin respuesta del Web App'));
-    }, 20000);
-    window[cbName] = function(json) {
-      resolved = true;
-      cleanup();
-      if (!json.ok) reject(new Error(json.error || 'Error en servidor'));
-      else resolve(json);
-    };
-    function cleanup() {
-      clearTimeout(timer);
-      try { delete window[cbName]; } catch(e) { window[cbName] = undefined; }
-      if (script.parentNode) script.parentNode.removeChild(script);
-    }
-    // No usar script.onerror: Apps Script redirige a googleusercontent.com
-    // y algunos browsers disparan onerror aunque la respuesta llegue OK.
-    // El timer + el callback son suficientes.
-    script.src = url;
-    document.head.appendChild(script);
-  });
-}
-
+/* ── SHAREPOINT ─────────────────────────────────────── */
 async function testSP() {
   const url = document.getElementById('spUrlInput').value.trim();
-  if (!url) { toast('Ingresá la URL del Web App', 'err'); return; }
-  S.spUrl = url;
+  if (!url) { toast('Ingresá la URL del sitio', 'err'); return; }
   setPill('wait', 'Probando…');
   try {
-    await gsCall('ping');
-    S.connected = true;
-    storageSet('skf_url', url);
-    setPill('ok', 'Google Sheets OK');
-    toast('Conexión exitosa con Google Sheets', 'ok');
-  } catch(e) {
-    setPill('err', 'Error');
-    toast('Error: ' + e.message, 'err');
+    const r = await fetch(`${url}/_api/web/title`, {
+      headers: { 'Accept': 'application/json;odata=verbose' }, credentials: 'include'
+    });
+    if (r.ok) {
+      const d = await r.json();
+      S.connected = true; S.spUrl = url; storageSet('skf_url', url);
+      setPill('ok', d?.d?.Title || 'Conectado');
+      toast('Conexión exitosa', 'ok');
+    } else {
+      setPill('err', 'Error ' + r.status);
+      toast(`HTTP ${r.status} — Verificá la URL y que estés logueado en M365`, 'err');
+    }
+  } catch {
+    setPill('err', 'Sin conexión');
+    toast('Error de red — Abrí la app desde SharePoint', 'err');
   }
 }
 
@@ -1547,86 +1580,88 @@ function saveSpUrl() {
 }
 
 async function verifyLists() {
-  if (!S.spUrl) { toast('Configurá la URL primero', 'err'); return; }
-  try {
-    const d = await gsCall('getInventario');
-    ['sn1','sn2','sn3'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) { el.className = 'step-num ok'; el.textContent = '✓'; }
-    });
-    const sd1 = document.getElementById('sd1');
-    if (sd1) sd1.innerHTML = `<span style="color:var(--green)">Hoja encontrada</span> — ${(d.items||[]).length} ítems`;
-    ['sd2','sd3'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.innerHTML = `<span style="color:var(--green)">Hoja activa</span>`;
-    });
-    toast('Hojas verificadas correctamente', 'ok');
-  } catch(e) {
-    ['sn1','sn2','sn3'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) { el.className = 'step-num err'; el.textContent = '✗'; }
-    });
-    toast('Error: ' + e.message, 'err');
+  if (!S.spUrl) { toast('Configurá la URL de SharePoint primero', 'err'); return; }
+  const lists = ['Inventario', 'Entradas', 'Salidas'];
+  for (let i = 0; i < lists.length; i++) {
+    const sn = document.getElementById(`sn${i+1}`);
+    const sd = document.getElementById(`sd${i+1}`);
+    sn.className = 'step-num'; sn.textContent = i + 1;
+    try {
+      const r = await fetch(`${S.spUrl}/_api/web/lists/GetByTitle('${lists[i]}')/ItemCount`,
+        { headers: { 'Accept': 'application/json;odata=verbose' }, credentials: 'include' });
+      if (r.ok) {
+        const d = await r.json();
+        sn.className = 'step-num ok'; sn.textContent = '✓';
+        sd.innerHTML = `<span style="color:var(--green)">Lista encontrada</span> — ${d?.d?.ItemCount ?? 0} ítems registrados`;
+      } else {
+        sn.className = 'step-num err'; sn.textContent = '✗';
+        sd.innerHTML = `<span style="color:var(--red)">Lista no encontrada</span> — HTTP ${r.status}`;
+      }
+    } catch {
+      sn.className = 'step-num err'; sn.textContent = '✗';
+      sd.innerHTML = `<span style="color:var(--red)">Error de red</span>`;
+    }
   }
 }
 
 async function syncSP() {
-  if (!S.spUrl) { toast('Configurá Google Sheets primero', 'err'); return; }
+  if (!S.spUrl) { toast('Configurá SharePoint primero', 'err'); return; }
   setPill('wait', 'Sincronizando…');
   try {
-    const [invRes, movRes] = await Promise.all([
-      gsCall('getInventario'),
-      gsCall('getMovimientos'),
-    ]);
-    S.inv = (invRes.items || []).map(it => ({
-      id:          'gs_' + it._row,
-      _row:        it._row,
-      codigo:      it.Codigo      || '',
-      descripcion: it.Descripcion || '',
-      categoria:   it.Categoria   || '',
-      stockActual: Number(it.StockActual) || 0,
-      stockMinimo: Number(it.StockMinimo) || 0,
-      unidad:      it.Unidad      || 'unid',
+    const r = await fetch(
+      `${S.spUrl}/_api/web/lists/GetByTitle('Inventario')/items?$top=500&$select=Codigo,Descripcion,Categoria,StockActual,StockMinimo,Unidad,ID`,
+      { headers: { 'Accept': 'application/json;odata=verbose' }, credentials: 'include' }
+    );
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    S.inv = (d?.d?.results || []).map(i => ({
+      id: 'sp' + i.ID, spId: i.ID, codigo: i.Codigo || '',
+      descripcion: i.Descripcion || '', categoria: i.Categoria || '',
+      stockActual: i.StockActual || 0, stockMinimo: i.StockMinimo || 0, unidad: i.Unidad || 'unid',
     }));
-    S.mov = (movRes.movimientos || []).map(m => ({
-      id:            'm_' + Math.random(),
-      tipo:          m.tipo,
-      fecha:         m.Fecha,
-      codigo:        m.Codigo,
-      descripcion:   m.Descripcion || '',
-      cantidad:      Number(m.Cantidad) || 0,
-      responsable:   m.Responsable || '',
-      observaciones: m.Observaciones || '',
-    }));
-    save(); filterRender(); renderMov();
-    S.connected = true; setPill('ok', 'Conectado');
+    save(); filterRender(); S.connected = true; setPill('ok', 'Conectado');
     document.getElementById('lastSync').textContent = 'Sync ' + new Date().toLocaleTimeString('es-AR', { hour12: false });
-    toast(`Sincronizado — ${S.inv.length} ítems, ${S.mov.length} movimientos`, 'ok');
-  } catch(e) {
+    toast(`Inventario sincronizado — ${S.inv.length} ítems`, 'ok');
+  } catch (e) {
     setPill('err', 'Error'); toast('Error al sincronizar: ' + e.message, 'err');
   }
 }
 
-async function pushSP(tipo, data) {
+async function pushSP(list, data) {
   if (!S.spUrl || !S.connected) return;
   try {
-    const action = tipo === 'Inventario' ? 'addItem'
-                 : tipo === 'Entradas'   ? 'addEntrada'
-                 : 'addSalida';
-    await gsCall(action, data);
-  } catch(e) { console.warn('pushSP error:', e.message); }
+    const dr = await fetch(`${S.spUrl}/_api/contextinfo`, {
+      method: 'POST', headers: { 'Accept': 'application/json;odata=verbose' }, credentials: 'include'
+    });
+    const dd = await dr.json();
+    const digest = dd?.d?.GetContextWebInformation?.FormDigestValue;
+    const payload = list === 'Inventario'
+      ? { Codigo: data.codigo, Descripcion: data.descripcion, Categoria: data.categoria, StockActual: data.stockActual, StockMinimo: data.stockMinimo, Unidad: data.unidad }
+      : { Fecha: data.fecha, CodigoItem: data.codigo, Cantidad: data.cantidad, Responsable: data.responsable, Observaciones: data.observaciones };
+    await fetch(`${S.spUrl}/_api/web/lists/GetByTitle('${list}')/items`, {
+      method: 'POST',
+      headers: { 'Accept': 'application/json;odata=verbose', 'Content-Type': 'application/json;odata=verbose', 'X-RequestDigest': digest },
+      credentials: 'include',
+      body: JSON.stringify({ __metadata: { type: `SP.Data.${list}ListItem` }, ...payload }),
+    });
+  } catch(e) {}
 }
 
 async function updateSPItem(item) {
-  if (!item._row || !S.spUrl) return;
+  if (!item.spId || !S.spUrl) return;
   try {
-    await gsCall('updateStock', {
-      _row:        item._row,
-      Codigo:      item.codigo,
-      StockActual: item.stockActual,
-      Responsable: 'sistema',
+    const dr = await fetch(`${S.spUrl}/_api/contextinfo`, {
+      method: 'POST', headers: { 'Accept': 'application/json;odata=verbose' }, credentials: 'include'
     });
-  } catch(e) { console.warn('updateSPItem error:', e.message); }
+    const dd = await dr.json();
+    const digest = dd?.d?.GetContextWebInformation?.FormDigestValue;
+    await fetch(`${S.spUrl}/_api/web/lists/GetByTitle('Inventario')/items(${item.spId})`, {
+      method: 'MERGE',
+      headers: { 'Accept': 'application/json;odata=verbose', 'Content-Type': 'application/json;odata=verbose', 'X-RequestDigest': digest, 'IF-MATCH': '*', 'X-HTTP-Method': 'MERGE' },
+      credentials: 'include',
+      body: JSON.stringify({ __metadata: { type: 'SP.Data.InventarioListItem' }, StockActual: item.stockActual }),
+    });
+  } catch(e) {}
 }
 
 /* ── JSON IMPORT ────────────────────────────────────── */
@@ -1657,7 +1692,350 @@ function exportCSV() {
   toast('CSV exportado', 'ok');
 }
 
-/* ── UTILS ──────────────────────────────────────────── */
+/* ══════════════════════════════════════════════════════
+   OCR MODULE — Lectura de remesas manuales con Claude Vision
+   ══════════════════════════════════════════════════════ */
+
+const OCR = {
+  apiKey: '',
+  imageBase64: null,
+  imageFile: null,
+  extracted: null,       // datos extraídos por Claude
+  rows: [],              // filas editables en modal paso 2
+};
+
+/* ── API KEY ────────────────────────────────────────── */
+function saveApiKey() {
+  const k = (document.getElementById('claudeApiKeyInput')?.value || '').trim();
+  if (!k) { toast('Ingresá una API key válida', 'err'); return; }
+  OCR.apiKey = k;
+  storageSet('skf_claude_key', k);
+  toast('API key guardada', 'ok');
+}
+
+function loadApiKey() {
+  const k = storageGet('skf_claude_key');
+  if (k) {
+    OCR.apiKey = k;
+    const el = document.getElementById('claudeApiKeyInput');
+    if (el) el.value = k;
+  }
+}
+
+/* ── MODAL PASO 1: SUBIR IMAGEN ─────────────────────── */
+function openOCRModal() {
+  loadApiKey();
+  OCR.imageBase64 = null; OCR.extracted = null; OCR.rows = [];
+  document.getElementById('ocrModalTitle').textContent = '📷 Leer Remesa Manual';
+  document.getElementById('ocrModalBody').innerHTML = renderOCRStep1();
+  document.getElementById('ocrModalFooter').innerHTML =
+    `<button class="btn btn-secondary btn-sm" onclick="closeOCRModal()">Cancelar</button>
+     <button class="btn btn-primary btn-sm" id="ocrProcessBtn" onclick="processOCR()" disabled>Extraer datos →</button>`;
+  document.getElementById('overlayOCR').classList.add('open');
+}
+
+function renderOCRStep1() {
+  return `
+    <div style="margin-bottom:14px">
+      <div style="font-size:13px;color:var(--text-2);margin-bottom:10px">
+        Sacá una foto clara de la remesa manual (buena iluminación, sin sombras sobre el texto).
+      </div>
+      <div class="ocr-drop" id="ocrDrop">
+        <input type="file" accept="image/*" capture="environment" onchange="onOCRFile(event)"
+               ondragover="ocrDragOver(event)" ondragleave="ocrDragLeave(event)" ondrop="ocrDrop(event)">
+        <div class="ocr-drop-icon">📄</div>
+        <div class="ocr-drop-label">Tocar para sacar foto o seleccionar imagen</div>
+        <div class="ocr-drop-hint">JPG · PNG · HEIC — máx. 5 MB</div>
+      </div>
+      <div id="ocrPreviewWrap" style="display:none;margin-top:10px;text-align:center">
+        <img id="ocrPreview" class="ocr-preview" alt="Preview">
+        <div id="ocrPreviewName" style="font-size:11px;color:var(--text-3);margin-top:4px"></div>
+      </div>
+    </div>
+    ${!OCR.apiKey ? `<div style="background:var(--yellow-bg);border:1px solid var(--yellow-bd);border-left:3px solid var(--yellow);border-radius:var(--r);padding:10px 13px;font-size:12.5px;color:var(--yellow)">
+      <strong>⚠ API key no configurada.</strong> Configurala en <span style="cursor:pointer;text-decoration:underline" onclick="closeOCRModal();showView('config')">Configuración → Claude Vision</span>.
+    </div>` : ''}
+  `;
+}
+
+function onOCRFile(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  if (file.size > 5 * 1024 * 1024) { toast('La imagen supera 5 MB', 'err'); return; }
+  OCR.imageFile = file;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    OCR.imageBase64 = ev.target.result.split(',')[1];
+    document.getElementById('ocrPreview').src = ev.target.result;
+    document.getElementById('ocrPreviewName').textContent = file.name + ' · ' + (file.size / 1024).toFixed(0) + ' KB';
+    document.getElementById('ocrPreviewWrap').style.display = 'block';
+    document.getElementById('ocrDrop').querySelector('.ocr-drop-icon').textContent = '✓';
+    document.getElementById('ocrDrop').querySelector('.ocr-drop-label').textContent = 'Imagen cargada';
+    document.getElementById('ocrProcessBtn').disabled = false;
+  };
+  reader.readAsDataURL(file);
+}
+
+function ocrDragOver(e) { e.preventDefault(); document.getElementById('ocrDrop').classList.add('drag'); }
+function ocrDragLeave()  { document.getElementById('ocrDrop').classList.remove('drag'); }
+function ocrDrop(e) {
+  e.preventDefault();
+  document.getElementById('ocrDrop').classList.remove('drag');
+  const dt = e.dataTransfer;
+  if (dt?.files?.length) onOCRFile({ target: { files: dt.files } });
+}
+
+/* ── PROCESO OCR → CLAUDE VISION ────────────────────── */
+async function processOCR() {
+  if (!OCR.imageBase64) { toast('Seleccioná una imagen primero', 'err'); return; }
+  if (!OCR.apiKey) { toast('Configurá la API key de Claude primero', 'err'); return; }
+
+  const btn = document.getElementById('ocrProcessBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="ocr-spinner"></span> Procesando…';
+
+  const prompt = `Sos un sistema OCR especializado en Notas de Remesa de SKF Argentina.
+Extraé TODOS los datos del documento en el siguiente JSON exacto, sin texto adicional:
+{
+  "numero_remesa": "string",
+  "fecha": "DD/MM/AAAA",
+  "cliente": "string",
+  "transporte": "string",
+  "concepto": "string",
+  "articulos": [
+    { "cantidad": number, "codigo_articulo": "string" }
+  ]
+}
+- "codigo_articulo": transcribí exactamente lo que aparece escrito (código SKF o nombre del artículo).
+- Si hay un campo vacío o ilegible, usá "".
+- Devolvé SOLO el JSON, sin markdown, sin comentarios.`;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': OCR.apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-calls': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-opus-4-5',
+        max_tokens: 1024,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: OCR.imageFile?.type || 'image/jpeg', data: OCR.imageBase64 } },
+            { type: 'text', text: prompt }
+          ]
+        }]
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err?.error?.message || `HTTP ${res.status}`);
+    }
+
+    const data = await res.json();
+    const raw = data.content?.[0]?.text || '';
+    // Limpiar posibles backticks
+    const clean = raw.replace(/```json|```/g, '').trim();
+    OCR.extracted = JSON.parse(clean);
+    renderOCRStep2();
+
+  } catch(e) {
+    toast('Error OCR: ' + e.message, 'err');
+    btn.disabled = false;
+    btn.innerHTML = 'Extraer datos →';
+  }
+}
+
+/* ── MODAL PASO 2: REVISAR Y CONFIRMAR ──────────────── */
+function renderOCRStep2() {
+  const ex = OCR.extracted;
+  const transporteOpts = ['Depósito Tortuguitas', 'Andreani', 'OCA', 'Correo Argentino', 'Retiro en planta', 'Otro'];
+
+  // Match artículos contra inventario (fuzzy por código o substring)
+  OCR.rows = (ex.articulos || []).map((art, idx) => {
+    const q = (art.codigo_articulo || '').toLowerCase().replace(/[\s\-\.]/g,'');
+    const match = S.inv.find(it => {
+      const c = it.codigo.toLowerCase().replace(/[\s\-\.]/g,'');
+      const d = it.descripcion.toLowerCase().replace(/[\s\-\.]/g,'');
+      return c.includes(q) || q.includes(c) || d.includes(q);
+    });
+    return { idx, raw: art.codigo_articulo, cantidad: art.cantidad, match, override: '' };
+  });
+
+  document.getElementById('ocrModalTitle').textContent = '📋 Revisar datos extraídos';
+  document.getElementById('ocrModalBody').innerHTML = `
+    <!-- Encabezado de la remesa -->
+    <div style="font-size:12px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Encabezado</div>
+    <div class="ocr-header-grid">
+      <div class="ocr-field">
+        <label>Nº Remesa</label>
+        <input id="ocr_nremesa" value="${esc(ex.numero_remesa || '')}" placeholder="0048-00005796">
+      </div>
+      <div class="ocr-field">
+        <label>Fecha</label>
+        <input id="ocr_fecha" value="${esc(ex.fecha || '')}" placeholder="22/04/2026">
+      </div>
+      <div class="ocr-field">
+        <label>Cliente</label>
+        <input id="ocr_cliente" value="${esc(ex.cliente || '')}" placeholder="Godoy Poviña">
+      </div>
+      <div class="ocr-field">
+        <label>Transporte</label>
+        <select id="ocr_transporte">
+          ${transporteOpts.map(t => `<option value="${t}"${ex.transporte && ex.transporte.toLowerCase().includes(t.split(' ')[0].toLowerCase()) ? ' selected' : ''}>${t}</option>`).join('')}
+        </select>
+      </div>
+      <div class="ocr-field" style="grid-column:1/-1">
+        <label>Concepto / OC</label>
+        <input id="ocr_concepto" value="${esc(ex.concepto || '')}" placeholder="OC 0613 26 AT EZEQUIEL MANZANO">
+      </div>
+    </div>
+
+    <!-- Artículos -->
+    <div style="font-size:12px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin:14px 0 8px">
+      Artículos detectados — ${OCR.rows.length} ítem${OCR.rows.length !== 1 ? 's' : ''}
+    </div>
+    <div style="background:var(--yellow-bg);border:1px solid var(--yellow-bd);border-radius:var(--r);padding:8px 12px;font-size:12px;color:var(--yellow);margin-bottom:10px">
+      <strong>⚠ Verificá</strong> los artículos en amarillo — no se encontró coincidencia exacta en el inventario. Podés corregir el código manualmente.
+    </div>
+    <div style="overflow-x:auto">
+    <table class="ocr-result-table">
+      <thead><tr>
+        <th>#</th><th>Extraído de remesa</th><th style="text-align:right">Cant.</th>
+        <th>Ítem en inventario</th><th>Estado</th>
+      </tr></thead>
+      <tbody id="ocrRowsBody">
+      </tbody>
+    </table>
+    </div>
+    <div style="font-size:11.5px;color:var(--text-3);margin-top:8px">
+      Los artículos sin match en inventario se registrarán con el código extraído de la remesa.
+    </div>
+  `;
+
+  document.getElementById('ocrModalFooter').innerHTML =
+    `<button class="btn btn-secondary btn-sm" onclick="openOCRModal()">← Volver</button>
+     <button class="btn btn-primary btn-sm" onclick="confirmOCRSalidas()">Confirmar ${OCR.rows.length} salida${OCR.rows.length!==1?'s':''}</button>`;
+
+  renderOCRRows();
+}
+
+function renderOCRRows() {
+  const tbody = document.getElementById('ocrRowsBody');
+  tbody.innerHTML = OCR.rows.map((row, i) => {
+    const hasMatch = !!row.match;
+    const matchLabel = hasMatch
+      ? `<span class="ocr-match">✓ ${esc(row.match.codigo)}</span><br><span style="font-size:11px;color:var(--text-3)">${esc(row.match.descripcion)}</span><br><span style="font-size:11px;color:var(--text-2)">Stock: ${row.match.stockActual} ${row.match.unidad}</span>`
+      : `<input class="form-control" style="font-size:12px;font-family:'DM Mono',monospace;padding:4px 7px" 
+              id="ocr_override_${i}" placeholder="Código inventario…" value="${esc(row.override)}"
+              oninput="ocrOverride(${i}, this.value)">`;
+    const statusEl = hasMatch
+      ? `<span class="ocr-match">✓ Match</span>`
+      : `<span class="ocr-nomatch">⚠ Sin match</span>`;
+    return `<tr${!hasMatch ? ' style="background:var(--yellow-bg)"' : ''}>
+      <td style="color:var(--text-3);font-size:12px">${i+1}</td>
+      <td><span style="font-family:'DM Mono',monospace;font-size:12.5px;color:var(--skf)">${esc(row.raw)}</span></td>
+      <td style="text-align:right">
+        <input class="ocr-qty-input${!hasMatch?' highlight':''}" type="number" min="1"
+               value="${row.cantidad}" onchange="ocrQty(${i}, this.value)">
+      </td>
+      <td>${matchLabel}</td>
+      <td>${statusEl}</td>
+    </tr>`;
+  }).join('');
+}
+
+function ocrQty(i, v) { OCR.rows[i].cantidad = parseInt(v) || 1; }
+function ocrOverride(i, v) {
+  OCR.rows[i].override = v.trim();
+  const found = S.inv.find(it => it.codigo.toLowerCase() === v.trim().toLowerCase());
+  if (found) { OCR.rows[i].match = found; renderOCRRows(); }
+}
+
+/* ── CONFIRMAR: REGISTRAR SALIDAS ───────────────────── */
+function confirmOCRSalidas() {
+  const nremesa  = document.getElementById('ocr_nremesa')?.value.trim()  || '';
+  const cliente  = document.getElementById('ocr_cliente')?.value.trim()  || '';
+  const transporte = document.getElementById('ocr_transporte')?.value    || '';
+  const concepto = document.getElementById('ocr_concepto')?.value.trim() || '';
+  const fecha    = document.getElementById('ocr_fecha')?.value.trim()    || today();
+  const obs      = `Remesa ${nremesa} · ${cliente} · ${transporte}${concepto ? ' · ' + concepto : ''}`;
+
+  let registradas = 0, errores = 0;
+
+  OCR.rows.forEach(row => {
+    const qty = row.cantidad || 1;
+    let it = row.match;
+
+    // Si no hay match pero hay override, buscar de nuevo
+    if (!it && row.override) {
+      it = S.inv.find(i => i.codigo.toLowerCase() === row.override.toLowerCase());
+    }
+
+    if (!it) {
+      // Crear ítem fantasma con stock 0 para no bloquearse
+      it = {
+        id: 'ocr_' + Date.now() + '_' + row.idx,
+        codigo: row.override || row.raw,
+        descripcion: row.raw,
+        categoria: 'Sin categoría',
+        stockActual: 0,
+        stockMinimo: 1,
+        unidad: 'unid',
+      };
+      S.inv.push(it);
+    }
+
+    if (it.stockActual < qty) {
+      // Registrar de todas formas pero avisar
+      errores++;
+    }
+
+    it.stockActual = Math.max(0, it.stockActual - qty);
+
+    const mov = {
+      id: 'm' + Date.now() + '_' + row.idx,
+      tipo: 'salida',
+      cantidad: qty,
+      fecha: convertFechaToISO(fecha),
+      codigo: it.codigo,
+      descripcion: it.descripcion,
+      responsable: cliente,
+      observaciones: obs,
+      itemId: it.id,
+    };
+    S.mov.push(mov);
+    registradas++;
+  });
+
+  save(); filterRender(); renderMov();
+  closeOCRModal();
+
+  if (errores > 0) {
+    toast(`${registradas} salidas registradas (${errores} con stock insuficiente — revisá)`, 'inf');
+  } else {
+    toast(`${registradas} salidas registradas · Remesa ${nremesa}`, 'ok');
+  }
+}
+
+function convertFechaToISO(f) {
+  // Acepta DD/MM/AAAA o YYYY-MM-DD
+  if (!f) return today();
+  if (f.includes('-')) return f;
+  const parts = f.split('/');
+  if (parts.length === 3) return `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
+  return today();
+}
+
+function closeOCRModal() { document.getElementById('overlayOCR').classList.remove('open'); }
+function closeOnBgOCR(e) { if (e.target === document.getElementById('overlayOCR')) closeOCRModal(); }
+
+
 /* ── STORAGE (localStorage con fallback a cookies para SharePoint) ── */
 function storageSet(key, value) {
   try {
