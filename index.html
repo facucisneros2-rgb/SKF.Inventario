@@ -1132,13 +1132,13 @@ input[type=checkbox].row-cb {
       </div>
 
       <div class="cfg-card">
-        <div class="cfg-title">API Key — Claude Vision (OCR)</div>
-        <div class="cfg-sub">Necesaria para leer remesas manuales con foto. Se guarda solo en este navegador.</div>
+        <div class="cfg-title">URL del Apps Script (OCR + Backend)</div>
+        <div class="cfg-sub">La misma URL del web app de Google Apps Script. Se usa para OCR y sincronización.</div>
         <div class="ocr-api-row">
-          <input type="password" id="claudeApiKeyInput" placeholder="sk-ant-api03-…" autocomplete="off">
-          <button class="btn btn-secondary btn-sm" onclick="saveApiKey()">Guardar</button>
+          <input type="url" id="gasUrlInput" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off">
+          <button class="btn btn-secondary btn-sm" onclick="saveGasUrl()">Guardar</button>
         </div>
-        <div class="form-hint">La clave nunca sale del navegador — se usa directamente contra api.anthropic.com</div>
+        <div class="form-hint">OCR gratuito via Google Vision API — hasta 1.000 imágenes/mes sin costo</div>
       </div>
 
       <div class="cfg-card">
@@ -1227,7 +1227,7 @@ function init() {
   renderMov();
   updateKPIs();
   updateNav();
-  loadApiKey();
+  loadGasUrl();
 }
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', init);
@@ -1779,38 +1779,38 @@ function exportCSV() {
 }
 
 /* ══════════════════════════════════════════════════════
-   OCR MODULE — Lectura de remesas manuales con Claude Vision
+   OCR MODULE — Lectura de remesas via Google Vision (Apps Script)
    ══════════════════════════════════════════════════════ */
 
 const OCR = {
-  apiKey: '',
+  gasUrl: '',
   imageBase64: null,
   imageFile: null,
-  extracted: null,       // datos extraídos por Claude
-  rows: [],              // filas editables en modal paso 2
+  extracted: null,
+  rows: [],
 };
 
-/* ── API KEY ────────────────────────────────────────── */
-function saveApiKey() {
-  const k = (document.getElementById('claudeApiKeyInput')?.value || '').trim();
-  if (!k) { toast('Ingresá una API key válida', 'err'); return; }
-  OCR.apiKey = k;
-  storageSet('skf_claude_key', k);
-  toast('API key guardada', 'ok');
+/* ── GAS URL ────────────────────────────────────────── */
+function saveGasUrl() {
+  const u = (document.getElementById('gasUrlInput')?.value || '').trim();
+  if (!u) { toast('Ingresá la URL del Apps Script', 'err'); return; }
+  OCR.gasUrl = u;
+  storageSet('skf_gas_url', u);
+  toast('URL guardada', 'ok');
 }
 
-function loadApiKey() {
-  const k = storageGet('skf_claude_key');
-  if (k) {
-    OCR.apiKey = k;
-    const el = document.getElementById('claudeApiKeyInput');
-    if (el) el.value = k;
+function loadGasUrl() {
+  const u = storageGet('skf_gas_url');
+  if (u) {
+    OCR.gasUrl = u;
+    const el = document.getElementById('gasUrlInput');
+    if (el) el.value = u;
   }
 }
 
 /* ── MODAL PASO 1: SUBIR IMAGEN ─────────────────────── */
 function openOCRModal() {
-  loadApiKey();
+  loadGasUrl();
   OCR.imageBase64 = null; OCR.extracted = null; OCR.rows = [];
   document.getElementById('ocrModalTitle').textContent = '📷 Leer Remesa Manual';
   document.getElementById('ocrModalBody').innerHTML = renderOCRStep1();
@@ -1821,14 +1821,14 @@ function openOCRModal() {
 }
 
 function renderOCRStep1() {
+  const noUrl = !OCR.gasUrl;
   return `
     <div style="margin-bottom:14px">
       <div style="font-size:13px;color:var(--text-2);margin-bottom:10px">
         Sacá una foto clara de la remesa manual (buena iluminación, sin sombras sobre el texto).
       </div>
       <div class="ocr-drop" id="ocrDrop">
-        <input type="file" accept="image/*" capture="environment" onchange="onOCRFile(event)"
-               ondragover="ocrDragOver(event)" ondragleave="ocrDragLeave(event)" ondrop="ocrDrop(event)">
+        <input type="file" accept="image/*" capture="environment" onchange="onOCRFile(event)">
         <div class="ocr-drop-icon">📄</div>
         <div class="ocr-drop-label">Tocar para sacar foto o seleccionar imagen</div>
         <div class="ocr-drop-hint">JPG · PNG · HEIC — máx. 5 MB</div>
@@ -1838,8 +1838,8 @@ function renderOCRStep1() {
         <div id="ocrPreviewName" style="font-size:11px;color:var(--text-3);margin-top:4px"></div>
       </div>
     </div>
-    ${!OCR.apiKey ? `<div style="background:var(--yellow-bg);border:1px solid var(--yellow-bd);border-left:3px solid var(--yellow);border-radius:var(--r);padding:10px 13px;font-size:12.5px;color:var(--yellow)">
-      <strong>⚠ API key no configurada.</strong> Configurala en <span style="cursor:pointer;text-decoration:underline" onclick="closeOCRModal();showView('config')">Configuración → Claude Vision</span>.
+    ${noUrl ? `<div style="background:var(--yellow-bg);border:1px solid var(--yellow-bd);border-left:3px solid var(--yellow);border-radius:var(--r);padding:10px 13px;font-size:12.5px;color:var(--yellow)">
+      <strong>⚠ URL del Apps Script no configurada.</strong> Configurala en <span style="cursor:pointer;text-decoration:underline" onclick="closeOCRModal();showView('config')">Configuración</span>.
     </div>` : ''}
   `;
 }
@@ -1862,72 +1862,31 @@ function onOCRFile(e) {
   reader.readAsDataURL(file);
 }
 
-function ocrDragOver(e) { e.preventDefault(); document.getElementById('ocrDrop').classList.add('drag'); }
-function ocrDragLeave()  { document.getElementById('ocrDrop').classList.remove('drag'); }
-function ocrDrop(e) {
-  e.preventDefault();
-  document.getElementById('ocrDrop').classList.remove('drag');
-  const dt = e.dataTransfer;
-  if (dt?.files?.length) onOCRFile({ target: { files: dt.files } });
-}
-
-/* ── PROCESO OCR → CLAUDE VISION ────────────────────── */
+/* ── PROCESO OCR → APPS SCRIPT → GOOGLE VISION ──────── */
 async function processOCR() {
   if (!OCR.imageBase64) { toast('Seleccioná una imagen primero', 'err'); return; }
-  if (!OCR.apiKey) { toast('Configurá la API key de Claude primero', 'err'); return; }
+  if (!OCR.gasUrl) { toast('Configurá la URL del Apps Script primero', 'err'); return; }
 
   const btn = document.getElementById('ocrProcessBtn');
   btn.disabled = true;
   btn.innerHTML = '<span class="ocr-spinner"></span> Procesando…';
 
-  const prompt = `Sos un sistema OCR especializado en Notas de Remesa de SKF Argentina.
-Extraé TODOS los datos del documento en el siguiente JSON exacto, sin texto adicional:
-{
-  "numero_remesa": "string",
-  "fecha": "DD/MM/AAAA",
-  "cliente": "string",
-  "transporte": "string",
-  "concepto": "string",
-  "articulos": [
-    { "cantidad": number, "codigo_articulo": "string" }
-  ]
-}
-- "codigo_articulo": transcribí exactamente lo que aparece escrito (código SKF o nombre del artículo).
-- Si hay un campo vacío o ilegible, usá "".
-- Devolvé SOLO el JSON, sin markdown, sin comentarios.`;
-
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch(OCR.gasUrl, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': OCR.apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-calls': 'true',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-opus-4-5',
-        max_tokens: 1024,
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'image', source: { type: 'base64', media_type: OCR.imageFile?.type || 'image/jpeg', data: OCR.imageBase64 } },
-            { type: 'text', text: prompt }
-          ]
-        }]
-      })
+        action: 'ocrRemesa',
+        imageBase64: OCR.imageBase64,
+        mimeType: OCR.imageFile?.type || 'image/jpeg',
+      }),
     });
 
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err?.error?.message || `HTTP ${res.status}`);
-    }
-
+    if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
-    const raw = data.content?.[0]?.text || '';
-    // Limpiar posibles backticks
-    const clean = raw.replace(/```json|```/g, '').trim();
-    OCR.extracted = JSON.parse(clean);
+    if (!data.ok) throw new Error(data.error || 'Error en el servidor');
+
+    OCR.extracted = data.extracted;
     renderOCRStep2();
 
   } catch(e) {
