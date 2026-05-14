@@ -872,7 +872,7 @@ input[type=checkbox].row-cb {
   <div class="tb-right">
     <div class="sp-pill" id="spPill" onclick="showView('config')">
       <div class="sp-dot"></div>
-      <span id="spText">Sin conexión SP</span>
+      <span id="spText">Sin conexión</span>
     </div>
   </div>
 </div>
@@ -905,7 +905,7 @@ input[type=checkbox].row-cb {
     </div>
     <div class="sb-section">Sistema</div>
     <div class="sb-item" id="sb-config" onclick="showView('config', this)">
-      <span class="sb-item-icon">⚙</span> SharePoint
+      <span class="sb-item-icon">⚙</span> Configuración
     </div>
     <div class="sb-footer">
       <strong>SKF CoMo Projects</strong><br>
@@ -995,7 +995,7 @@ input[type=checkbox].row-cb {
           <div class="card-title">Componentes</div>
           <div style="display:flex;gap:8px;align-items:center">
             <span class="card-meta" id="cardMeta">0 ítems</span>
-            <button class="btn-icon" onclick="syncSP()" title="Sincronizar con SharePoint">↺</button>
+            <button class="btn-icon" onclick="loadGasUrl()" title="Recargar configuración">↺</button>
           </div>
         </div>
         <!-- Barra de selección -->
@@ -1076,69 +1076,20 @@ input[type=checkbox].row-cb {
     <div class="view" id="view-config">
       <div class="page-header">
         <div>
-          <div class="page-title">Configuración SharePoint</div>
-          <div class="page-sub">Conexión via API REST · sin registro Azure AD · sesión M365</div>
-        </div>
-      </div>
-
-      <div class="info-banner">
-        <div class="info-banner-title">Sitio detectado — SKF SFSOARG</div>
-        <div class="info-banner-body">
-          https://skfgroup.sharepoint.com/sites/SFSOARG<br>
-          02  CoMo Proyects / 01 - Laboratorio CoMo / App Proyectos / INVENTARIO
+          <div class="page-title">Configuración</div>
+          <div class="page-sub">Backend Google Apps Script · OCR Google Vision</div>
         </div>
       </div>
 
       <div class="cfg-card">
-        <div class="cfg-title">URL del sitio SharePoint</div>
-        <div class="cfg-sub">URL base del sitio donde están las listas</div>
+        <div class="cfg-title">URL del Apps Script</div>
+        <div class="cfg-sub">URL del web app desplegado en Google Apps Script — usada para backend y OCR</div>
         <div class="cfg-row">
-          <input type="url" id="spUrlInput" value="https://skfgroup.sharepoint.com/sites/SFSOARG" placeholder="https://skfgroup.sharepoint.com/sites/SFSOARG">
-          <button class="btn btn-secondary btn-sm" onclick="saveSpUrl()">Guardar</button>
-          <button class="btn btn-primary btn-sm" onclick="testSP()">Probar conexión</button>
-        </div>
-      </div>
-
-      <div class="cfg-card">
-        <div class="cfg-title">Estado de las listas</div>
-        <div class="cfg-sub">Verificá que las 3 listas existan en el sitio antes de operar</div>
-        <div class="step-list">
-          <div class="step-item">
-            <div class="step-num" id="sn1">1</div>
-            <div>
-              <div class="step-label">Lista: Inventario</div>
-              <div class="step-detail" id="sd1">Codigo · Descripcion · Categoria · StockActual · StockMinimo · Unidad</div>
-            </div>
-          </div>
-          <div class="step-item">
-            <div class="step-num" id="sn2">2</div>
-            <div>
-              <div class="step-label">Lista: Entradas</div>
-              <div class="step-detail" id="sd2">Fecha · CodigoItem · Cantidad · Responsable · Observaciones</div>
-            </div>
-          </div>
-          <div class="step-item">
-            <div class="step-num" id="sn3">3</div>
-            <div>
-              <div class="step-label">Lista: Salidas</div>
-              <div class="step-detail" id="sd3">Fecha · CodigoItem · Cantidad · Responsable · Observaciones</div>
-            </div>
-          </div>
-        </div>
-        <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn btn-primary btn-sm" onclick="verifyLists()">Verificar listas</button>
-          <button class="btn btn-secondary btn-sm" onclick="syncSP()">↺ Sincronizar todo</button>
-        </div>
-      </div>
-
-      <div class="cfg-card">
-        <div class="cfg-title">URL del Apps Script (OCR + Backend)</div>
-        <div class="cfg-sub">La misma URL del web app de Google Apps Script. Se usa para OCR y sincronización.</div>
-        <div class="ocr-api-row">
           <input type="url" id="gasUrlInput" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off">
           <button class="btn btn-secondary btn-sm" onclick="saveGasUrl()">Guardar</button>
+          <button class="btn btn-primary btn-sm" onclick="testGas()">Probar conexión</button>
         </div>
-        <div class="form-hint">OCR gratuito via Google Vision API — hasta 1.000 imágenes/mes sin costo</div>
+        <div class="form-hint" style="margin-top:6px">OCR gratuito via Google Vision API — hasta 1.000 imágenes/mes sin costo</div>
       </div>
 
       <div class="cfg-card">
@@ -1148,7 +1099,7 @@ input[type=checkbox].row-cb {
           <input type="file" id="fileInput" accept=".json,.csv" style="font-size:12px;color:var(--text-2)">
           <button class="btn btn-secondary btn-sm" onclick="importJSON()">Cargar JSON</button>
         </div>
-        <div class="form-hint" style="margin-top:8px">Formato esperado: array de objetos con campos codigo, descripcion, categoria, stockActual, stockMinimo, unidad</div>
+        <div class="form-hint" style="margin-top:8px">Formato: array de objetos con campos codigo, descripcion, categoria, stockActual, stockMinimo, unidad</div>
       </div>
     </div><!-- /config -->
 
@@ -1188,8 +1139,6 @@ const S = {
   inv: [], mov: [],
   selected: new Set(),
   undoSnapshot: null, undoTimer: null, undoSecs: 0,
-  spUrl: 'https://skfgroup.sharepoint.com/sites/SFSOARG',
-  connected: false,
   page: 1, perPage: 20,
   sortF: 'codigo', sortD: 'asc',
   movTab: 'todos',
@@ -1197,32 +1146,15 @@ const S = {
 
 /* ── INIT ───────────────────────────────────────────── */
 function init() {
-
-  // Detect SharePoint context
-  const inSP = window.location.hostname.indexOf('sharepoint.com') !== -1
-             || window.location.hostname.indexOf('microsoftonline.com') !== -1
-             || typeof _spPageContextInfo !== 'undefined';
-
-  // Load persisted data
-  let loaded = false;
   try {
     const si = storageGet('skf_inv');
-    if (si) { S.inv = JSON.parse(si); loaded = true; }
+    if (si) S.inv = JSON.parse(si);
     const sm = storageGet('skf_mov');
     if (sm) S.mov = JSON.parse(sm);
-    const su = storageGet('skf_url');
-    if (su) {
-      S.spUrl = su;
-      const el = document.getElementById('spUrlInput');
-      if (el) el.value = su;
-    }
-  } catch(e) {
-  }
+  } catch(e) {}
 
-  // Sin demo — arranque limpio
   if (!S.inv) S.inv = [];
 
-  // Render
   filterRender();
   renderMov();
   updateKPIs();
@@ -1610,7 +1542,6 @@ function saveNewItem() {
   };
   S.inv.push(it); save(); closeModal(); filterRender();
   toast(`Ítem creado: ${codigo}`, 'ok');
-  if (S.connected) pushSP('Inventario', it);
 }
 
 function saveMov(tipo, itemId) {
@@ -1628,126 +1559,33 @@ function saveMov(tipo, itemId) {
   };
   S.mov.push(mov); save(); closeModal(); filterRender(); renderMov();
   toast(`${tipo === 'entrada' ? 'Entrada' : 'Salida'} registrada: ${qty} ${it.unidad} — ${it.codigo}`, 'ok');
-  if (S.connected) {
-    pushSP(tipo === 'entrada' ? 'Entradas' : 'Salidas', mov);
-    updateSPItem(it);
-  }
 }
 
-/* ── SHAREPOINT ─────────────────────────────────────── */
-async function testSP() {
-  const url = document.getElementById('spUrlInput').value.trim();
-  if (!url) { toast('Ingresá la URL del sitio', 'err'); return; }
+/* ── APPS SCRIPT CONNECTION ─────────────────────────── */
+async function testGas() {
+  const url = (document.getElementById('gasUrlInput')?.value || '').trim();
+  if (!url) { toast('Ingresá la URL del Apps Script', 'err'); return; }
   setPill('wait', 'Probando…');
   try {
-    const r = await fetch(`${url}/_api/web/title`, {
-      headers: { 'Accept': 'application/json;odata=verbose' }, credentials: 'include'
-    });
-    if (r.ok) {
-      const d = await r.json();
-      S.connected = true; S.spUrl = url; storageSet('skf_url', url);
-      setPill('ok', d?.d?.Title || 'Conectado');
-      toast('Conexión exitosa', 'ok');
-    } else {
-      setPill('err', 'Error ' + r.status);
-      toast(`HTTP ${r.status} — Verificá la URL y que estés logueado en M365`, 'err');
-    }
+    const r = await fetch(`${url}?action=ping&callback=cb`, { mode: 'no-cors' });
+    // no-cors no permite leer la respuesta, pero si no tira error la URL existe
+    OCR.gasUrl = url;
+    storageSet('skf_gas_url', url);
+    setPill('ok', 'Apps Script OK');
+    toast('URL guardada y verificada', 'ok');
   } catch {
-    setPill('err', 'Sin conexión');
-    toast('Error de red — Abrí la app desde SharePoint', 'err');
+    setPill('err', 'Error');
+    toast('No se pudo conectar — verificá la URL', 'err');
   }
 }
 
-function saveSpUrl() {
-  const url = document.getElementById('spUrlInput').value.trim();
-  if (!url) { toast('URL inválida', 'err'); return; }
-  S.spUrl = url; storageSet('skf_url', url);
+function saveGasUrl() {
+  const url = (document.getElementById('gasUrlInput')?.value || '').trim();
+  if (!url) { toast('Ingresá la URL', 'err'); return; }
+  OCR.gasUrl = url;
+  storageSet('skf_gas_url', url);
+  setPill('ok', 'Apps Script OK');
   toast('URL guardada', 'ok');
-}
-
-async function verifyLists() {
-  if (!S.spUrl) { toast('Configurá la URL de SharePoint primero', 'err'); return; }
-  const lists = ['Inventario', 'Entradas', 'Salidas'];
-  for (let i = 0; i < lists.length; i++) {
-    const sn = document.getElementById(`sn${i+1}`);
-    const sd = document.getElementById(`sd${i+1}`);
-    sn.className = 'step-num'; sn.textContent = i + 1;
-    try {
-      const r = await fetch(`${S.spUrl}/_api/web/lists/GetByTitle('${lists[i]}')/ItemCount`,
-        { headers: { 'Accept': 'application/json;odata=verbose' }, credentials: 'include' });
-      if (r.ok) {
-        const d = await r.json();
-        sn.className = 'step-num ok'; sn.textContent = '✓';
-        sd.innerHTML = `<span style="color:var(--green)">Lista encontrada</span> — ${d?.d?.ItemCount ?? 0} ítems registrados`;
-      } else {
-        sn.className = 'step-num err'; sn.textContent = '✗';
-        sd.innerHTML = `<span style="color:var(--red)">Lista no encontrada</span> — HTTP ${r.status}`;
-      }
-    } catch {
-      sn.className = 'step-num err'; sn.textContent = '✗';
-      sd.innerHTML = `<span style="color:var(--red)">Error de red</span>`;
-    }
-  }
-}
-
-async function syncSP() {
-  if (!S.spUrl) { toast('Configurá SharePoint primero', 'err'); return; }
-  setPill('wait', 'Sincronizando…');
-  try {
-    const r = await fetch(
-      `${S.spUrl}/_api/web/lists/GetByTitle('Inventario')/items?$top=500&$select=Codigo,Descripcion,Categoria,StockActual,StockMinimo,Unidad,ID`,
-      { headers: { 'Accept': 'application/json;odata=verbose' }, credentials: 'include' }
-    );
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    const d = await r.json();
-    S.inv = (d?.d?.results || []).map(i => ({
-      id: 'sp' + i.ID, spId: i.ID, codigo: i.Codigo || '',
-      descripcion: i.Descripcion || '', categoria: i.Categoria || '',
-      stockActual: i.StockActual || 0, stockMinimo: i.StockMinimo || 0, unidad: i.Unidad || 'unid',
-    }));
-    save(); filterRender(); S.connected = true; setPill('ok', 'Conectado');
-    document.getElementById('lastSync').textContent = 'Sync ' + new Date().toLocaleTimeString('es-AR', { hour12: false });
-    toast(`Inventario sincronizado — ${S.inv.length} ítems`, 'ok');
-  } catch (e) {
-    setPill('err', 'Error'); toast('Error al sincronizar: ' + e.message, 'err');
-  }
-}
-
-async function pushSP(list, data) {
-  if (!S.spUrl || !S.connected) return;
-  try {
-    const dr = await fetch(`${S.spUrl}/_api/contextinfo`, {
-      method: 'POST', headers: { 'Accept': 'application/json;odata=verbose' }, credentials: 'include'
-    });
-    const dd = await dr.json();
-    const digest = dd?.d?.GetContextWebInformation?.FormDigestValue;
-    const payload = list === 'Inventario'
-      ? { Codigo: data.codigo, Descripcion: data.descripcion, Categoria: data.categoria, StockActual: data.stockActual, StockMinimo: data.stockMinimo, Unidad: data.unidad }
-      : { Fecha: data.fecha, CodigoItem: data.codigo, Cantidad: data.cantidad, Responsable: data.responsable, Observaciones: data.observaciones };
-    await fetch(`${S.spUrl}/_api/web/lists/GetByTitle('${list}')/items`, {
-      method: 'POST',
-      headers: { 'Accept': 'application/json;odata=verbose', 'Content-Type': 'application/json;odata=verbose', 'X-RequestDigest': digest },
-      credentials: 'include',
-      body: JSON.stringify({ __metadata: { type: `SP.Data.${list}ListItem` }, ...payload }),
-    });
-  } catch(e) {}
-}
-
-async function updateSPItem(item) {
-  if (!item.spId || !S.spUrl) return;
-  try {
-    const dr = await fetch(`${S.spUrl}/_api/contextinfo`, {
-      method: 'POST', headers: { 'Accept': 'application/json;odata=verbose' }, credentials: 'include'
-    });
-    const dd = await dr.json();
-    const digest = dd?.d?.GetContextWebInformation?.FormDigestValue;
-    await fetch(`${S.spUrl}/_api/web/lists/GetByTitle('Inventario')/items(${item.spId})`, {
-      method: 'MERGE',
-      headers: { 'Accept': 'application/json;odata=verbose', 'Content-Type': 'application/json;odata=verbose', 'X-RequestDigest': digest, 'IF-MATCH': '*', 'X-HTTP-Method': 'MERGE' },
-      credentials: 'include',
-      body: JSON.stringify({ __metadata: { type: 'SP.Data.InventarioListItem' }, StockActual: item.stockActual }),
-    });
-  } catch(e) {}
 }
 
 /* ── JSON IMPORT ────────────────────────────────────── */
