@@ -1137,37 +1137,89 @@ async function runOCR() {
 
 /* ══════════════════════════════════════════════════════════
    OCR — PARSEO DE TEXTO
-   Formato Nota de Remesa SKF Argentina:
-   - Código y Precio siempre vacíos
-   - Cada ítem: CANTIDAD (número entero) + DESCRIPCIÓN/DESIGNACIÓN
-   - Ej: "16 CMSS 2200", "4 CMSS 942-LC-05", "1 CMON4116-Plus"
-   - El match con inventario es opcional (fuzzy por descripción)
+   Calibrado con texto real Vision API sobre Nota de Remesa
+   SKF Argentina. El layout que devuelve Vision es:
+
+   [cabecera impresa mezclada con manuscritos]
+   ENVIAMOS A:......
+   [línea con NOMBRE DEL CLIENTE manuscrito]
+   ...
+   N° 004800005796       ← remesa SIN guión (12 dígitos)
+   FECHA: 22/04/2026.
+   ...
+   □ OC 061326. AT EZEQUIEL MANZANO.   ← OC + contacto cliente
+   CODIGO
+   CANTIDAD
+   ARTICULO
+   4 (MON G116-PLS       ← cantidad + artículo
+   16 CMSS 2200
+   ...
+   PRECIO UNITARIO
+   ...
+   N° 0048-00005601 AL 0048-00006350   ← rango talonario (IGNORAR)
 ══════════════════════════════════════════════════════════ */
 function parseOcrText(text) {
   const lines = text.split('\n').map(l => l.trim()).filter(l => l);
 
-  // ── CABECERA ─────────────────────────────────────────
-  // N° remesa: "N° 0048- 00005796" o "N° 0048-00005796"
-  const remesaMatch = text.match(/N[°º\.o]?\s*0*(\d{3,4})\s*[-–]\s*0*(\d{4,8})/i);
-  if (remesaMatch) {
-    document.getElementById('ocr_remesa').value =
-      remesaMatch[1].padStart(4,'0') + '-' + remesaMatch[2].padStart(8,'0');
+  // ─── REMESA ─────────────────────────────────────────
+  // "N° 004800005796" (sin guión, 10-12 dígitos juntos)
+  // IMPORTANTE: descartar el "N° 0048-00005601 AL 0048-00006350" del talonario
+  let remesa = '';
+  for (const l of lines) {
+    // Saltar línea de rango de talonario
+    if (/AL\s+\d{4}-\d{6,8}/i.test(l)) continue;
+    // Patrón: N° seguido de 10-12 dígitos (con o sin guión/espacio)
+    const m = l.match(/N[°º\.o]?\s*0*(\d{3,4})[\s-]*0*(\d{4,8})/i);
+    if (m && !/IMPRESION|HAB\.|EXPTE/i.test(l)) {
+      remesa = m[1].padStart(4, '0') + '-' + m[2].padStart(8, '0');
+      break;
+    }
+  }
+  if (remesa) document.getElementById('ocr_remesa').value = remesa;
+
+  // ─── OC + RESPONSABLE CLIENTE ───────────────────────
+  // Ej: "□ OC 061326. AT EZEQUIEL MANZANO."
+  const ocLine = lines.find(l => /\bOC\s+\d/i.test(l));
+  if (ocLine) {
+    const ocM = ocLine.match(/OC\s+(\d{4,})/i);
+    if (ocM) document.getElementById('ocr_oc').value = ocM[1];
+    // Responsable: lo que sigue después de "AT " hasta el final/punto
+    const atM = ocLine.match(/AT\s+([A-ZÁÉÍÓÚÑ\s]+)/i);
+    if (atM) {
+      const resp = atM[1].trim().replace(/[.,;:]+$/, '');
+      document.getElementById('ocr_resp').value = resp;
+    }
   }
 
-  // OC: "OC 061326" o "OC061326"
-  const ocMatch = text.match(/O\.?C\.?\s*([0-9]{4,})/i);
-  if (ocMatch) document.getElementById('ocr_oc').value = ocMatch[1];
-
-  // Cliente: línea después de "ENVIAMOS A:"
-  const clienteMatch = text.match(/ENVIAMOS\s+A[:\s]+(.+)/i);
-  if (clienteMatch) {
-    const cli = clienteMatch[1].trim().replace(/\.$/, '');
-    if (cli.length > 2) document.getElementById('ocr_cliente').value = cli;
+  // ─── CLIENTE ────────────────────────────────────────
+  // Después de "ENVIAMOS A:" puede venir en la misma línea o en una posterior
+  let cliente = '';
+  for (let i = 0; i < lines.length; i++) {
+    if (/ENVIAMOS\s+A/i.test(lines[i])) {
+      // ¿hay nombre en la misma línea?
+      const same = lines[i].match(/ENVIAMOS\s+A[:\s.]+(.+)/i);
+      if (same && same[1].replace(/\./g,'').trim().length > 2) {
+        cliente = same[1].replace(/\./g, '').trim();
+      } else {
+        // Buscar en las próximas 3 líneas la primera que parezca nombre
+        for (let j = i+1; j < Math.min(i+4, lines.length); j++) {
+          const cand = lines[j].trim();
+          if (/DOMICILIO|I\.V\.A|C\.U\.I/i.test(cand)) continue;
+          if (cand.length < 3) continue;
+          // Línea con mayúsculas mayoría (nombre manuscrito) — Vision lo devuelve en CAPS
+          if (/^[A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s.]+$/.test(cand)) {
+            cliente = cand.replace(/\.$/, '').trim();
+            break;
+          }
+        }
+      }
+      break;
+    }
   }
+  if (cliente) document.getElementById('ocr_cliente').value = cliente;
 
-  // Fecha: "FECHA: 22/04/2026" o "22/04/2026"
-  const fechaMatch = text.match(/FECHA[:\s]*([0-9]{1,2})[/\-]([0-9]{1,2})[/\-]([0-9]{2,4})/i)
-                  || text.match(/([0-9]{1,2})[/\-]([0-9]{1,2})[/\-](20[0-9]{2})/);
+  // ─── FECHA ──────────────────────────────────────────
+  const fechaMatch = text.match(/FECHA[:\s]*(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/i);
   if (fechaMatch) {
     const d = fechaMatch[1].padStart(2,'0');
     const m = fechaMatch[2].padStart(2,'0');
@@ -1177,60 +1229,95 @@ function parseOcrText(text) {
     document.getElementById('ocr_fecha').value = today();
   }
 
-  // ── PALABRAS CLAVE DE CABECERA A IGNORAR ─────────────
-  // Líneas que sabemos que NO son ítems
-  const SKIP_PATTERNS = [
-    /^SKF/i, /^AV\./i, /^PCIA/i, /^I\.V\.A/i, /^ENVIAMOS/i,
-    /^DOMICILIO/i, /^TRANSPORTISTA/i, /^EN CONCEPTO/i,
-    /^CODIGO/i, /^CANTIDAD/i, /^ARTICULO/i, /^PRECIO/i,
-    /^AUTORIZADO/i, /^ENTREGADO/i, /^VIGILANCIA/i, /^CONTABILIZADO/i,
-    /^PROCESAMIENTO/i, /^IMPRENTA/i, /^FECHA DE/i, /^C\.A\.I/i,
-    /^C\.U\.I\.T/i, /^Ing\./i, /^CNERC/i, /^N[°º]/i,
-    /^NOTA DE/i, /^VENTAS/i, /^DEVOLUCION/i, /^REPARACION/i,
-    /^Código N/i, /^DOCUMENTO/i, /^NO VALIDO/i, /^FACTURA/i,
-    /^30-/i, /^901-/i,  // CUIT patterns
-    /^\d{2}-\d{8}-\d{1}$/,  // CUIT formato
-  ];
+  // ─── ÍTEMS ──────────────────────────────────────────
+  // Estrategia: tomar solo las líneas ENTRE el marcador "ARTICULO" (o "CANTIDAD")
+  // y "PRECIO UNITARIO" / "AUTORIZADO" / "IMPRENTA"
+  let startIdx = -1, endIdx = lines.length;
+  for (let i = 0; i < lines.length; i++) {
+    if (startIdx < 0 && /^ARTICULO$/i.test(lines[i])) startIdx = i + 1;
+    if (startIdx >= 0 && /PRECIO|UNITARIO|AUTORIZA|ENTREGADO|IMPRENTA|VIGILANCIA/i.test(lines[i])) {
+      endIdx = i; break;
+    }
+  }
+  // Fallback: si no encontramos "ARTICULO" puro, intentamos después de "CANTIDAD"
+  if (startIdx < 0) {
+    for (let i = 0; i < lines.length; i++) {
+      if (/^CANTIDAD$/i.test(lines[i])) { startIdx = i + 1; break; }
+    }
+  }
+  if (startIdx < 0) startIdx = 0;
 
-  const isSkipLine = line => SKIP_PATTERNS.some(p => p.test(line));
-
-  // ── EXTRACCIÓN DE ÍTEMS ───────────────────────────────
-  // Patrón: línea que empieza con número (cantidad) seguido de descripción
-  // Ej: "16 CMSS 2200", "4 CMSS 942-LC-05", "1 CMON4116-Plus"
+  const itemLines = lines.slice(startIdx, endIdx);
   const items = [];
+  let pendingQty = null;   // si la cantidad vino sola en una línea anterior
 
-  lines.forEach(line => {
-    if (isSkipLine(line)) return;
+  itemLines.forEach(line => {
+    // Limpiar caracteres ruido del OCR sobre escritura manuscrita
+    const clean = line.replace(/^[\(\)\[\]□¤•·\-]+/, '').trim();
+    if (!clean) return;
 
-    // Patrón principal: número al inicio de la línea + descripción
-    const m = line.match(/^([0-9]+(?:[.,][0-9]+)?)\s+(.{3,})/);
-    if (!m) return;
+    // Caso A: línea es solo un número (cantidad solitaria)
+    const onlyQty = clean.match(/^([0-9]{1,3})[.,]?$/);
+    if (onlyQty) {
+      pendingQty = parseInt(onlyQty[1]);
+      return;
+    }
 
-    const cantidad = parseFloat(m[1].replace(',', '.'));
-    const descripcion = m[2].trim();
+    // Caso B: línea empieza con cantidad + descripción
+    // Ej: "4 CMON G116-PLS", "16 CMSS 2200"
+    const qtyDesc = clean.match(/^([0-9]{1,3})[.,]?\s+(.{2,})/);
+    if (qtyDesc) {
+      const qty = parseInt(qtyDesc[1]);
+      const desc = qtyDesc[2].trim().replace(/\.$/, '');
+      if (qty > 0 && qty < 1000 && desc.length >= 2) {
+        items.push({ cantidad: qty, descripcion: desc, match: findInvMatch(desc) });
+        pendingQty = null;
+        return;
+      }
+    }
 
-    // Descartar cantidades absurdas (> 9999) o descripciones muy cortas
-    if (isNaN(cantidad) || cantidad <= 0 || cantidad > 9999) return;
-    if (descripcion.length < 3) return;
-    // Descartar si la "descripción" parece ser un número de teléfono / código postal
-    if (/^\d+$/.test(descripcion)) return;
-
-    // Intentar match fuzzy en inventario por descripción o código
-    const descUp = descripcion.toUpperCase();
-    const inv = S.inv.find(it =>
-      it.codigo.toUpperCase().includes(descUp) ||
-      descUp.includes(it.codigo.toUpperCase()) ||
-      it.descripcion.toUpperCase().includes(descUp) ||
-      descUp.includes(it.descripcion.toUpperCase().split(' ')[0])
-    ) || null;
-
-    items.push({ descripcion, cantidad, match: inv });
+    // Caso C: línea sin cantidad, pero tenemos una pendiente de la línea anterior
+    if (pendingQty !== null && clean.length >= 2 && !/^[0-9]+$/.test(clean)) {
+      const desc = clean.replace(/\.$/, '');
+      items.push({ cantidad: pendingQty, descripcion: desc, match: findInvMatch(desc) });
+      pendingQty = null;
+      return;
+    }
   });
 
   S.ocrItems = items;
   renderOcrTable(items);
-  // No hay sección ilegibles — todo lo que no matchea se muestra en la tabla editable
   document.getElementById('ilegiblesSection').style.display = 'none';
+}
+
+// Match fuzzy: busca por código (con o sin separadores) y por primera palabra de descripción
+function findInvMatch(desc) {
+  if (!desc) return null;
+  // Normalizar: mayúsculas, sin espacios/guiones, sin caracteres especiales
+  const norm = s => s.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const descN = norm(desc);
+  if (descN.length < 3) return null;
+
+  // 1) Match exacto normalizado
+  let m = S.inv.find(it => norm(it.codigo) === descN);
+  if (m) return m;
+
+  // 2) Match por inclusión (código normalizado contenido en descripción)
+  m = S.inv.find(it => {
+    const cN = norm(it.codigo);
+    return cN.length >= 4 && (descN.includes(cN) || cN.includes(descN));
+  });
+  if (m) return m;
+
+  // 3) Match por primera palabra significativa
+  const firstWord = desc.toUpperCase().split(/[\s\-]/)[0];
+  if (firstWord.length >= 3) {
+    m = S.inv.find(it =>
+      it.codigo.toUpperCase().startsWith(firstWord) ||
+      it.descripcion.toUpperCase().includes(firstWord)
+    );
+  }
+  return m || null;
 }
 
 function renderOcrTable(items) {
@@ -1239,34 +1326,80 @@ function renderOcrTable(items) {
     tb.innerHTML = `<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--text-3)">No se detectaron ítems. Revisá la imagen o agregá manualmente.</td></tr>`;
     return;
   }
+  // Pre-construir opciones del inventario (una sola vez)
+  const invOpts = S.inv
+    .slice()
+    .sort((a,b) => a.codigo.localeCompare(b.codigo))
+    .map(it => `<option value="${esc(it.codigo)}">${esc(it.codigo)} — ${esc(it.descripcion)} (stock: ${it.stockActual} ${it.unidad})</option>`)
+    .join('');
+
   tb.innerHTML = items.map((it, i) => {
-    const matchHtml = it.match
-      ? `<span style="color:var(--green);font-size:12px">✓ ${esc(it.match.codigo)} · ${it.match.stockActual} ${it.match.unidad}</span>`
-      : `<span style="color:var(--text-3);font-size:12px">— sin match</span>`;
-    return `<tr>
-      <td style="color:var(--text-3);font-size:12px">${i+1}</td>
-      <td><input id="ocr_desc_${i}" value="${esc(it.descripcion)}" onchange="reMatchOcrRow(${i})" style="width:100%;min-width:180px"></td>
-      <td><input id="ocr_qty_${i}" value="${it.cantidad}" type="number" min="0.01" step="0.01"></td>
-      <td id="ocr_match_${i}">${matchHtml}</td>
-      <td><button style="background:none;border:none;cursor:pointer;color:var(--red);font-size:14px" onclick="removeOcrRow(${i})">✕</button></td>
+    const selectedCode = it.match ? it.match.codigo : '';
+    const rowBg = it.match ? '' : 'background:#FFF8E6';
+    const stockInfo = it.match
+      ? `<div style="font-size:10.5px;color:var(--green);margin-top:3px">✓ Stock actual: ${it.match.stockActual} ${it.match.unidad}</div>`
+      : `<div style="font-size:10.5px;color:var(--yellow);margin-top:3px">⚠ Elegí ítem del inventario</div>`;
+
+    return `<tr style="${rowBg}">
+      <td style="color:var(--text-3);font-size:12px;vertical-align:top;padding-top:14px">${i+1}</td>
+      <td style="vertical-align:top">
+        <input id="ocr_desc_${i}" value="${esc(it.descripcion)}" onchange="reMatchOcrRow(${i})"
+               style="width:100%;min-width:160px;font-size:12.5px" placeholder="Texto OCR">
+        <div style="font-size:10px;color:var(--text-3);margin-top:2px">📷 Texto leído (editable)</div>
+      </td>
+      <td style="vertical-align:top">
+        <input id="ocr_qty_${i}" value="${it.cantidad}" type="number" min="0.01" step="1"
+               style="width:70px;text-align:right">
+      </td>
+      <td style="vertical-align:top;min-width:220px">
+        <select id="ocr_sel_${i}" onchange="onOcrManualSelect(${i})"
+                style="width:100%;padding:5px 6px;border:1px solid var(--border-2);border-radius:var(--r);font-family:'DM Mono',monospace;font-size:11.5px;background:#fff">
+          <option value="">— Sin match / No descontar —</option>
+          ${invOpts.replace(`value="${esc(selectedCode)}"`, `value="${esc(selectedCode)}" selected`)}
+        </select>
+        <div id="ocr_match_${i}">${stockInfo}</div>
+      </td>
+      <td style="vertical-align:top;padding-top:14px">
+        <button style="background:none;border:none;cursor:pointer;color:var(--red);font-size:14px" onclick="removeOcrRow(${i})" title="Quitar fila">✕</button>
+      </td>
     </tr>`;
   }).join('');
 }
 
-function reMatchOcrRow(i) {
-  const desc = (document.getElementById(`ocr_desc_${i}`)?.value || '').trim().toUpperCase();
-  S.ocrItems[i].descripcion = desc;
-  const inv = S.inv.find(it =>
-    it.codigo.toUpperCase().includes(desc) ||
-    desc.includes(it.codigo.toUpperCase()) ||
-    it.descripcion.toUpperCase().includes(desc) ||
-    desc.includes(it.descripcion.toUpperCase().split(' ')[0])
-  ) || null;
+// Cuando el usuario elige manualmente un ítem del dropdown
+function onOcrManualSelect(i) {
+  const sel = document.getElementById(`ocr_sel_${i}`);
+  if (!sel) return;
+  const code = sel.value;
+  const inv = code ? S.inv.find(it => it.codigo === code) : null;
   S.ocrItems[i].match = inv;
-  const cell = document.getElementById(`ocr_match_${i}`);
-  if (cell) cell.innerHTML = inv
-    ? `<span style="color:var(--green);font-size:12px">✓ ${esc(inv.codigo)} · ${inv.stockActual} ${inv.unidad}</span>`
-    : `<span style="color:var(--text-3);font-size:12px">— sin match</span>`;
+  // Actualizar info de stock debajo
+  const info = document.getElementById(`ocr_match_${i}`);
+  if (info) info.innerHTML = inv
+    ? `<div style="font-size:10.5px;color:var(--green);margin-top:3px">✓ Stock actual: ${inv.stockActual} ${inv.unidad}</div>`
+    : `<div style="font-size:10.5px;color:var(--yellow);margin-top:3px">⚠ Elegí ítem del inventario</div>`;
+  // Actualizar fondo de la fila
+  const row = sel.closest('tr');
+  if (row) row.style.background = inv ? '' : '#FFF8E6';
+  buildOcrConfirmSummary();
+}
+
+function reMatchOcrRow(i) {
+  const desc = (document.getElementById(`ocr_desc_${i}`)?.value || '').trim();
+  S.ocrItems[i].descripcion = desc;
+  const inv = findInvMatch(desc);
+  S.ocrItems[i].match = inv;
+  // Sincronizar el dropdown
+  const sel = document.getElementById(`ocr_sel_${i}`);
+  if (sel) sel.value = inv ? inv.codigo : '';
+  // Actualizar info de stock
+  const info = document.getElementById(`ocr_match_${i}`);
+  if (info) info.innerHTML = inv
+    ? `<div style="font-size:10.5px;color:var(--green);margin-top:3px">✓ Stock actual: ${inv.stockActual} ${inv.unidad}</div>`
+    : `<div style="font-size:10.5px;color:var(--yellow);margin-top:3px">⚠ Elegí ítem del inventario</div>`;
+  // Fondo de la fila
+  const row = document.getElementById(`ocr_desc_${i}`)?.closest('tr');
+  if (row) row.style.background = inv ? '' : '#FFF8E6';
   buildOcrConfirmSummary();
 }
 
