@@ -1712,7 +1712,6 @@ async function processOCR() {
   try {
     const res = await fetch(OCR.gasUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         action: 'ocrRemesa',
         imageBase64: OCR.imageBase64,
@@ -1720,8 +1719,14 @@ async function processOCR() {
       }),
     });
 
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const data = await res.json();
+    let data;
+    try {
+      data = await res.json();
+    } catch(_) {
+      const text = await res.text();
+      throw new Error('Respuesta inválida del servidor: ' + text.substring(0, 100));
+    }
+
     if (!data.ok) throw new Error(data.error || 'Error en el servidor');
 
     OCR.extracted = data.extracted;
@@ -1733,7 +1738,6 @@ async function processOCR() {
     btn.innerHTML = 'Extraer datos →';
   }
 }
-
 /* ── MODAL PASO 2: REVISAR Y CONFIRMAR ──────────────── */
 function renderOCRStep2() {
   const ex = OCR.extracted;
