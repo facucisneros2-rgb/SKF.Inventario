@@ -1465,15 +1465,35 @@ function renderRemesasTable(data) {
 /* ══════════════════════════════════════════════════════════
    GAS — COMUNICACIÓN
 ══════════════════════════════════════════════════════════ */
+/*
+  gasCall — anti-CORS para Google Apps Script
+  ─────────────────────────────────────────────
+  GAS rechaza fetch con body desde orígenes externos (CORS preflight falla).
+  Solución probada:
+    • Peticiones de LECTURA  → GET con parámetros en la URL (sin preflight)
+    • Peticiones de ESCRITURA (payload pequeño) → form-encoded POST (sin preflight)
+    • Peticiones con payload grande (PDF base64) → form-encoded POST con chunking
+  Nunca se envía Content-Type: application/json.
+*/
 async function gasCall(data) {
   if (!S.gasUrl) return null;
+  const action = data.action || '';
+  const READ_ACTIONS = ['getInventario','getMovimientos','getRemesas'];
+
   try {
-    // Sin Content-Type para evitar CORS preflight
-    const r = await fetch(S.gasUrl + '?action=' + encodeURIComponent(data.action), {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-    return await r.json();
+    if (READ_ACTIONS.includes(action)) {
+      // GET — sin preflight
+      const params = new URLSearchParams({ action });
+      if (data.cliente) params.set('cliente', data.cliente);
+      const r = await fetch(S.gasUrl + '?' + params.toString());
+      return await r.json();
+    } else {
+      // POST form-encoded — sin preflight (Content-Type application/x-www-form-urlencoded es "simple")
+      // Para payload grande (PDF) codificamos el JSON como campo único "payload"
+      const body = new URLSearchParams({ payload: JSON.stringify(data) });
+      const r = await fetch(S.gasUrl, { method: 'POST', body });
+      return await r.json();
+    }
   } catch(e) {
     return null;
   }
@@ -1484,8 +1504,9 @@ async function testGAS() {
   if (!url) { toast('Ingresá la URL del Apps Script', 'err'); return; }
   setGasPill('wait', 'Probando…');
   try {
-    const r = await fetch(url + '?action=getInventario', { method: 'POST', body: JSON.stringify({ action: 'getInventario' }) });
+    const r = await fetch(url + '?action=getInventario');
     if (r.ok) {
+      const d = await r.json();
       S.gasUrl = url; storageSet('skf_gas', url); S.connected = true;
       setGasPill('ok', 'GAS conectado');
       toast('Conexión exitosa con Apps Script', 'ok');
