@@ -492,9 +492,12 @@ tbody td { padding: 9px 13px; vertical-align: middle; }
         <div class="ocr-preview-wrap" id="ocrPreviewWrap">
           <img id="ocrPreviewImg" src="" alt="remesa">
         </div>
-        <div style="display:flex;gap:8px;margin-top:8px" id="ocrStep1Btns" style="display:none">
+        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap" id="ocrStep1Btns">
           <button class="btn btn-primary" id="btnRunOCR" onclick="runOCR()" style="display:none">
             🔍 Procesar con OCR
+          </button>
+          <button class="btn btn-secondary btn-sm" id="btnShowRawOCR" onclick="showRawOCR()" style="display:none">
+            🔎 Ver texto OCR crudo (debug)
           </button>
         </div>
       </div>
@@ -1117,9 +1120,12 @@ async function runOCR() {
     const fullText = data?.responses?.[0]?.fullTextAnnotation?.text || '';
     if (!fullText) { toast('No se detectó texto en la imagen', 'err'); btn.disabled = false; btn.textContent = '🔍 Procesar con OCR'; return; }
 
+    S.ocrLastText = fullText;        // guardar para botón debug
+    console.log('═══ TEXTO OCR CRUDO ═══\n' + fullText);
     parseOcrText(fullText);
     document.getElementById('ocrStep2').style.display = 'block';
     document.getElementById('ocrStep3').style.display = 'block';
+    document.getElementById('btnShowRawOCR').style.display = 'inline-flex';
     buildOcrConfirmSummary();
     toast('OCR completado', 'ok');
   } catch(e) {
@@ -1454,9 +1460,11 @@ async function generarPDFRemesa() {
 function resetOCR() {
   S.ocrImageBase64 = null;
   S.ocrItems = [];
+  S.ocrLastText = '';
   document.getElementById('ocrDropZone').style.display = '';
   document.getElementById('ocrPreviewWrap').style.display = 'none';
   document.getElementById('btnRunOCR').style.display = 'none';
+  document.getElementById('btnShowRawOCR').style.display = 'none';
   document.getElementById('ocrStep2').style.display = 'none';
   document.getElementById('ocrStep3').style.display = 'none';
   document.getElementById('pdfStatusBox').classList.remove('show');
@@ -1464,6 +1472,29 @@ function resetOCR() {
   document.getElementById('ocrFileInput').value = '';
   ['ocr_remesa','ocr_oc','ocr_cliente','ocr_resp'].forEach(id => setEl(id, ''));
   document.getElementById('ocr_fecha').value = today();
+}
+
+function showRawOCR() {
+  const text = S.ocrLastText || '(sin texto)';
+  setModal('Texto OCR crudo (Vision API)', `
+    <div style="font-size:11px;color:var(--text-3);margin-bottom:8px">
+      Este es el texto exacto que devolvió Google Vision. Copialo y mandalo para calibrar el parser.
+    </div>
+    <textarea id="rawOcrText" readonly style="width:100%;height:340px;font-family:'DM Mono',monospace;font-size:11.5px;padding:10px;border:1px solid var(--border-2);border-radius:var(--r);resize:vertical;line-height:1.5">${esc(text)}</textarea>
+  `, `
+    <button class="btn btn-secondary btn-sm" onclick="copyRawOCR()">📋 Copiar al portapapeles</button>
+    <button class="btn btn-primary btn-sm" onclick="closeModal()">Cerrar</button>
+  `);
+}
+
+function copyRawOCR() {
+  const ta = document.getElementById('rawOcrText');
+  if (!ta) return;
+  ta.select();
+  navigator.clipboard.writeText(ta.value).then(
+    () => toast('Texto copiado al portapapeles', 'ok'),
+    () => { document.execCommand('copy'); toast('Texto copiado', 'ok'); }
+  );
 }
 
 /* ══════════════════════════════════════════════════════════
