@@ -1523,31 +1523,39 @@ function parseOcrText(text) {
   // Ignorar: línea del talonario "AL 0048-XXXXXXXX" y pie de imprenta.
   let remesa = '';
 
-  // Estrategia 1: buscar en el texto plano completo (maneja saltos de línea entre los números)
-  // Patrón: "N° DDDD - DDDDDDDD" con cualquier cantidad de espacios
+  // Buscar "N° 0048 00005856" — Vision omite el guión, devuelve solo espacio.
+  // IMPORTANTE: ignorar la línea del talonario "N° 0048-00005601 AL 0048-00006350"
+  // que siempre tiene " AL " después del primer número.
   {
-    const m = flat.match(/N[°º]\s*(\d{3,4})\s*[-–]\s*(\d{5,8})(?!\s*AL\b)/i);
-    if (m && !flat.includes('AL ' + m[2])) {
-      remesa = m[1].padStart(4,'0') + '-' + m[2].padStart(8,'0');
+    // Patrón principal en texto plano: N° + 4 dígitos + separador opcional + 8 dígitos
+    // El separador puede ser: guión, espacio, o nada.
+    // Lookahead negativo: descartar si va seguido de " AL "
+    const m = flat.match(/N[°º]\s*(\d{3,4})\s*[-–]?\s*(\d{5,8})(?!\s*AL\b)/i);
+    if (m) {
+      // Verificar que no es el número del talonario comprobando que no aparece "AL XXXXXXXX" después
+      const afterMatch = flat.slice(flat.indexOf(m[0]) + m[0].length, flat.indexOf(m[0]) + m[0].length + 10);
+      if (!/AL\b/i.test(afterMatch)) {
+        remesa = m[1].padStart(4,'0') + '-' + m[2].padStart(8,'0');
+      }
     }
   }
-  // Estrategia 2: línea a línea, más tolerante
+  // Fallback línea a línea si el método anterior falló o agarró el talonario
   if (!remesa) {
     for (let i = 0; i < lines.length; i++) {
       const l = lines[i];
-      if (/AL\s+\d{4}[-–]\d/i.test(l)) continue;          // rango talonario
+      if (/AL\s+\d{4}[-–\s]\d/i.test(l)) continue;   // rango talonario
       if (/IMPRESION|IMPRENTA|C\.A\.I\.|FACTURACION/i.test(l)) continue; // pie
 
-      // "N° 0048 - 00005856" en una sola línea
-      let m = l.match(/N[°º]\s*(\d{3,4})\s*[-–]\s*(\d{5,8})/i);
+      // "N° 0048 00005856" o "N° 0048-00005856" (con o sin guión)
+      let m = l.match(/N[°º]\s*(\d{3,4})\s*[-–]?\s*(\d{5,8})/i);
       if (m) { remesa = m[1].padStart(4,'0') + '-' + m[2].padStart(8,'0'); break; }
 
-      // "N° 004800005856" — 12 dígitos juntos
+      // "N° 004800005856" — 12 dígitos juntos sin separador
       m = l.match(/N[°º]\s*(\d{12})/i);
       if (m) { remesa = m[1].slice(0,4) + '-' + m[1].slice(4); break; }
 
-      // "N° 0048" en esta línea y los dígitos del número en la siguiente
-      m = l.match(/N[°º]\s*(\d{3,4})\s*[-–]?\s*$/i);
+      // "N° 0048" sola y número en la línea siguiente
+      m = l.match(/N[°º]\s*(\d{3,4})\s*$/i);
       if (m && i + 1 < lines.length) {
         const next = lines[i+1].match(/^\s*(\d{5,8})/);
         if (next) { remesa = m[1].padStart(4,'0') + '-' + next[1].padStart(8,'0'); break; }
